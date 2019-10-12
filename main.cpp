@@ -1,7 +1,8 @@
 #include <iostream>
 #include <string>
 #include <fstream>
-#include "sequential/city.hpp"
+#include <random>
+#include <algorithm>
 #include "sequential/travelling_salesman_problem.hpp"
 
 using namespace std;
@@ -10,7 +11,8 @@ using namespace std;
 int main() {
     ifstream input("data/att48.tsp");
 
-    // TODO: Make this nicer
+    // TODO: Make this nicer, the files are not as consistent as I hoped.
+    //       The files can be found at http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsp/index.html
     string name, comment, type, dimension, edge_weight_type, node;
     getline(input, name);
     name = name.substr(7, name.length());
@@ -26,7 +28,7 @@ int main() {
 
     // Read cities
     int number_cities = stoi(dimension);
-    TravellingSalesmanProblem problem(number_cities, 1000);
+    TravellingSalesmanProblem problem(number_cities, 100, 10, 0.05);
     cout << "Reading " << dimension << " cities of problem " << name << "... ";
     // Read city coordinates
     for (int i = 0; i < number_cities; ++i) {
@@ -38,6 +40,10 @@ int main() {
     input.close();
     cout << "Done!" << endl;
 
+    // Solve problem
+    problem.solve(1000);
+
+    // TODO: Graph, maybe visualization
 
     return 0;
 }
