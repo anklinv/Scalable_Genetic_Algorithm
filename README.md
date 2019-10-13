@@ -13,12 +13,18 @@
 * L3 Cache:    6 MB
 * Hyper-Threading Technology:    Enabled
 * Memory:    8 GB (2 banks, 1600MHz)
- 
+#### Compiler:
+* gcc version: 4.2.1 (possibly too outdated)
 * Apple clang version 11.0.0 (clang-1100.0.33.8)
 * Target: x86_64-apple-darwin18.7.0
 * Thread model: posix
  
  # Progress
+ 
+ ## Miscelaneous
+ 
+ * write python preprocessing scripts: create node edge incidence matrix: done
+ * python postprocessing: visualization of results via plots etc.
  
  ## 1st experiment: sequential implementation of GA
  
