@@ -28,9 +28,10 @@
  
  ## 1st experiment: sequential implementation of GA
  
- * Working implementation by Valentin
+ * Working implementation by Valentin in C++
  * Done, needs to be benchmarked
  * Maybe some optimization and cleaning can be done
+ * Implementation in C started by Justin: so far can only read node incidence matrix from a .csv file
  
  ## 2nd experiment: naive parallel implementation with MPI
  
