@@ -2,7 +2,7 @@
  Scalable implementation for the course project of Design of Parallel and High Performance Computing HS19
 
 ## How to run
-You need a compiler that can compile C++17 (e.g. use g++) and also cmake
+You need mpicxx, mpiexec (any MPI implementation) and also cmake
 (install this using `sudo apt install cmake g++`)
 
 Then you first run cmake:
@@ -10,7 +10,7 @@ Then you first run cmake:
 Compile the program:
 `make`
 Run the program:
-`./Distributed_Genetic_Algorithm`
+`mpiexec -np <number of processes> ./Distributed_Genetic_Algorithm`
 
  # Setup
 
