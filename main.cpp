@@ -105,6 +105,7 @@ double setupAndRunGA(int rank) {
     
     // Read cities
     int number_cities = stoi(dimension);
+    int node_edge_mat[number_cities * number_cities];
     TravellingSalesmanProblem problem(number_cities, 100, 10, 0.05);
     cout << "Reading " << dimension << " cities of problem " << name << "... (rank " << rank << ")" << endl;
     // Read city coordinates
