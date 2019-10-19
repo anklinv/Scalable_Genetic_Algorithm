@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include <sstream>
 
 #include "sequential/travelling_salesman_problem.hpp"
 
@@ -107,14 +108,30 @@ double setupAndRunGA(int rank) {
     TravellingSalesmanProblem problem(number_cities, 100, 10, 0.05);
     cout << "Reading " << dimension << " cities of problem " << name << "... (rank " << rank << ")" << endl;
     // Read city coordinates
-    for (int i = 0; i < number_cities; ++i) {
-        int index;
-        double x, y;
-        input >> index >> x >> y;
-        problem.cities.push_back({x,y});
-    }
     input.close();
-    cout << "Done! (rank " << rank << ")" << endl;
+    ifstream input2("data/att48.csv");
+    
+    for (int i = 0; i < number_cities; ++i) {
+        string line;
+        getline(input2, line);
+        if(!input2.good()){
+            break;
+        }
+        stringstream iss(line);
+        
+	for (int j = 0; j < number_cities; ++j) {
+            string val;
+            getline(iss, val, ';');
+            if(!iss.good()){
+                break;
+            }
+            stringstream converter(val);
+            converter >> node_edge_mat[i + number_cities * j];
+        }
+    }
+    problem.cities = node_edge_mat;
+    input2.close();
+    cout << "Done!" << endl;
     
     // Solve problem
     double final_distance;

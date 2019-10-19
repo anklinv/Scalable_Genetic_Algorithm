@@ -14,7 +14,7 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
     this->mutation_rate = mutation_rate;
     this->fitness = vector<double>(population_count, 0.0);
     this->ranks = vector<int>(population_count);
-    this->cities.reserve(problem_size);
+    this->cities = new int[problem_size * problem_size];
     this->gen = mt19937(this->rd());
     this->nr_mutations = std::uniform_int_distribution<>(0, this->population_count * this->mutation_rate);
     this->random_gene = std::uniform_int_distribution(0, this->problem_size - 1);
@@ -102,14 +102,10 @@ void TravellingSalesmanProblem::rank_individuals() {
 double TravellingSalesmanProblem::evaluate_fitness(int *individual) {
     double route_distance = 0.0;
     for (int i = 0; i < this->problem_size - 1; ++i) {
-        route_distance += distance(this->cities[individual[i]], this->cities[individual[i+1]]);
+        route_distance += this->cities[individual[i] + problem_size * individual[i+1]];		//matrix lookup for a distance between two cities
     }
-    route_distance += distance(this->cities[individual[problem_size-1]], this->cities[individual[0]]);
+    route_distance += this->cities[individual[problem_size-1] + problem_size * individual[0]];	//complete the round trip
     return route_distance;
-}
-
-double TravellingSalesmanProblem::distance(City &a, City &b) {
-    return sqrt(pow(a.x - b.x, 2.0) + pow(a.y - b.y, 2.0));
 }
 
 void TravellingSalesmanProblem::breed(int *parent1, int *parent2, int* child) {

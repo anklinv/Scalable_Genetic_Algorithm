@@ -31,7 +31,7 @@ public:
     double mutation_rate;
 
     /// 2D coordinates of the cities
-    vector<City> cities;
+    int* cities;
 
     /// Pointer to the population indices, which has size population_count * problem_size
     int** population;
