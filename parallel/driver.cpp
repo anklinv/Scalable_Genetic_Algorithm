@@ -1,21 +1,31 @@
 
 #include <mpi.h> /* requirement for MPI */
 
-#include "travelling_salesman_problem.hpp"
-
 #include <iostream>
 #include <string>
 #include <fstream>
 #include <random>
 #include <algorithm>
-#include <iomanip>
+#include <cmath>
+
+#include "travelling_salesman_problem.hpp"
 
 
 using namespace std;
 
 
-// constants
-int DATA_TAG = 0x011;
+// typedefs
+typedef vector<double> vec_d;
+
+
+const int DATA_TAG = 0x011;
+
+
+double setupAndRunGA(int rank);
+
+double computeStdDev(vec_d data);
+
+double computeMean(vec_d data);
 
 
 int main(int argc, char** argv) {
@@ -25,7 +35,8 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
-    // each process runs the GA and stores the result
+    
+    // reads the graph from a file and runs the GA
     double final_distance = setupAndRunGA(rank);
     
     if (rank != 0) {
@@ -38,19 +49,23 @@ int main(int argc, char** argv) {
         int numProcesses;
         MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
         
-        double res = final_distance;
         double buff;
+        vec_d all_dists;
         
         // receive results from all other ranks
-        // combine results to find the optimum
-        for(int i = 0; i < numProcesses; i++) {
+        for(int i = 0; i < numProcesses - 1; i++) {
             
             MPI_Recv(&buff, 1, MPI_DOUBLE, MPI_ANY_SOURCE, DATA_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            res = min(res, buff);
+            
+            all_dists.push_back(buff);
+            final_distance = min(buff, final_distance);
         }
         
-        // output optimum
-        cout << "Final result: " << res << endl;
+        double mean = computeMean(all_dists);
+        double stddev = computeStdDev(all_dists);
+        
+        cout << "Best final distance overall is " << final_distance << endl;
+        cout << "(mean is " << mean << ", std dev is " << stddev << ")" << endl;
     }
     
     
@@ -60,58 +75,71 @@ int main(int argc, char** argv) {
 }
 
 
-int parseGraphHeader(string& graph) {
-    
-    ifstream input(graph);
-    string num_cities;
-    
-    for (int i = 6; i > 0; i--) {
+double setupAndRunGA(int rank) {
         
-        string line_buffer;
-        getline(line_buffer);
-        
-        if(i == 3) num_cities =
-            line_buffer.substr(12, line_buffer.length());
+    ifstream input("../data/att48.tsp");
+    string name, comment, type, dimension, edge_weight_type, node;
+    
+    getline(input, name);
+    name = name.substr(7, name.length());
+    
+    getline(input, comment);
+    comment = comment.substr(10, comment.length());
+    
+    getline(input, type);
+    type = type.substr(7, type.length());
+    
+    getline(input, dimension);
+    dimension = dimension.substr(12, dimension.length());
+    
+    getline(input, edge_weight_type);
+    edge_weight_type = edge_weight_type.substr(18, edge_weight_type.length());
+    
+    getline(input, node);
+    
+    // Read cities
+    int number_cities = stoi(dimension);
+    TravellingSalesmanProblem problem(number_cities, 100, 10, 0.05);
+    cout << "Reading " << dimension << " cities of problem " << name << "... (rank " << rank << ")" << endl;
+    // Read city coordinates
+    for (int i = 0; i < number_cities; ++i) {
+        int index;
+        double x, y;
+        input >> index >> x >> y;
+        problem.cities.push_back({x,y});
     }
+    input.close();
+    cout << "Done! (rank " << rank << ")" << endl;
     
-    return stoi(num_cities);
+    
+    // Solve problem
+    double final_distance;
+    final_distance = problem.solve(1000);
+    cout << "Final distance is " << final_distance << " (rank " << rank << ")" << endl;
+    
+    return final_distance;
 }
 
 
-double setupAndRunGA(int rank) {
+double computeStdDev(vec_d data) {
     
-    string graph = "../data/att48.tsp";
-    int num_cities = parseGraphHeader(graph);
-
-    TravellingSalesmanProblem problem(num_cities, 100, 10, 0.05);
-
-#ifdef debug
-    cout << "Reading " << number_cities << " cities ... (rank " << rank << ")" << endl;
-#endif
+    double mean = accumulate(data.begin(), data.end(), 0.0) / data.size();
     
-    for (int i = 0; i < num_cities; ++i) {
-        
-        int index;
-        double x, y;
-        
-        input >> index >> x >> y;
-        problem.cities.push_back({x, y});
+    double sum_squares = 0.0;
+    
+    for(auto it = data.begin(); it != data.end(); it++) {
+        sum_squares += (*it - mean) * (*it - mean);
     }
     
-    input.close();
+    sum_squares = sum_squares / data.size();
     
-#ifdef debug
-    cout << "Done!  (rank " << rank << ")" << endl;
+    return sqrt(sum_squares);
+}
 
-    cout << "Start running the GA ...  (rank " << rank << ")" << endl;
-#endif
-    
-    double final_distance = problem.solve(1000);
 
-#ifdef debug
-    cout << "Done!  (rank " << rank << ")" << endl;
-#endif
+double computeMean(vec_d data) {
     
-    return final_distance;
+    double sum = accumulate(data.begin(), data.end(), 0.0);
+    return sum / data.size();
 }
 
