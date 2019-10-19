@@ -59,7 +59,8 @@ public:
 
     /// Solve the problem by evolving for a given number of steps.
     /// \param nr_epochs number of steps to evolve
-    void solve(int nr_epochs);
+    /// \return the best length of the best path found by the algorithm
+    double solve(int nr_epochs);
 
     /// Calculate the fitness of all individuals, save it in this->fitness and also calculate the ranks and save those
     /// in this->ranks

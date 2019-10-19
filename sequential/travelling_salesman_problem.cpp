@@ -52,10 +52,9 @@ void TravellingSalesmanProblem::evolve() {
 }
 
 
-void TravellingSalesmanProblem::solve(const int nr_epochs) {
+double TravellingSalesmanProblem::solve(const int nr_epochs) {
     this->rank_individuals();
     double initial_distance = *min_element(this->fitness.begin(), this->fitness.end());
-    cout << "Initial distance is: " << initial_distance << endl;
 
 #ifdef debug
     for (int i = 0; i < this->population_count; ++i) {
@@ -86,7 +85,8 @@ void TravellingSalesmanProblem::solve(const int nr_epochs) {
 
     this->rank_individuals();
     double final_distance = *min_element(this->fitness.begin(), this->fitness.end());
-    cout << "Final distance is: " << final_distance << endl;
+    
+    return final_distance;
 }
 
 void TravellingSalesmanProblem::rank_individuals() {
