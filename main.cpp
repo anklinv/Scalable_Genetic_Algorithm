@@ -51,7 +51,9 @@ int main(int argc, char** argv) {
         MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
         
         double buff;
+        
         vec_d all_dists;
+        all_dists.push_back(final_distance);
         
         // receive results from all other ranks
         for(int i = 0; i < numProcesses - 1; i++) {
