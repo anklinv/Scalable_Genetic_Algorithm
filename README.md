@@ -42,6 +42,7 @@ Run the program:
  * Working implementation by Valentin in C++
  * Done, needs to be benchmarked
  * Maybe some optimization and cleaning can be done
+ * reads inputs from csv file as opposed to raw txt file
  * Implementation in C started by Justin: so far can only read node incidence matrix from a .csv file
 
  ## 2nd experiment: naive parallel implementation with MPI
