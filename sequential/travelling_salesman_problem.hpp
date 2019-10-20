@@ -15,8 +15,8 @@ public:
     /// \param problem_size number of nodes in the graph
     /// \param population_count size of the population
     /// \param elite_size number of individuals that survive for sure
-    /// \param mutation_rate rate of mutations
-    TravellingSalesmanProblem(int problem_size, int population_count, int elite_size, double mutation_rate);
+    /// \param mutation_rate 1/mutation_rate is the probability that an individual gets a mutation
+    TravellingSalesmanProblem(int problem_size, int population_count, int elite_size, int mutation_rate);
 
     /// Number of nodes in the graph
     int problem_size;
@@ -28,7 +28,7 @@ public:
     int elite_size;
 
     /// Probability of each index to randomly switch with a random second index
-    double mutation_rate;
+    int mutation_rate;
 
     /// 2D coordinates of the cities
     int* cities;
@@ -45,14 +45,11 @@ public:
     /// For randomness
     std::random_device rd;
     std::mt19937 gen;
-    std::uniform_int_distribution<> nr_mutations;
-    std::uniform_int_distribution<> random_gene;
-    std::uniform_int_distribution<> random_individual;
 
     /// Calculate the fitness of an individual, which is the length of the closed path in the graph and return it.
     /// \param individual pointer to an array of size problem_size
     /// \return the length of the path in the graph
-    double evaluate_fitness(int* individual);
+    double evaluate_fitness(const int* individual);
 
     /// Run a single iteration of selection, breeding and mutation
     void evolve();
@@ -84,11 +81,8 @@ public:
     /// Apply mutation to the whole population
     void mutate_population();
 
-    /// Calculates the distance between two cities
-    /// \param a origin city
-    /// \param b destination city
-    /// \return euclidean distance from a to b
-    static double distance(City &a, City &b);
+private:
+    int rand_range(const int &a, const int&b);
 };
 
 

@@ -1,5 +1,6 @@
 #include <random>
 #include <iostream>
+#include <cstdlib>
 #include <algorithm>
 #include <set>
 #include "travelling_salesman_problem.hpp"
@@ -7,7 +8,7 @@
 using namespace std;
 
 TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, const int population_count,
-        const int elite_size, const double mutation_rate) {
+        const int elite_size, const int mutation_rate) {
     this->problem_size = problem_size;
     this->population_count = population_count;
     this->elite_size = elite_size;
@@ -16,9 +17,6 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
     this->ranks = vector<int>(population_count);
     this->cities = new int[problem_size * problem_size];
     this->gen = mt19937(this->rd());
-    this->nr_mutations = std::uniform_int_distribution<>(0, this->population_count * this->mutation_rate);
-    this->random_gene = std::uniform_int_distribution(0, this->problem_size - 1);
-    this->random_individual = std::uniform_int_distribution(0, this->population_count - 1);
 
     // TODO: make this nicer
     this->population = new int *[population_count];
@@ -99,7 +97,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     });
 }
 
-double TravellingSalesmanProblem::evaluate_fitness(int *individual) {
+double TravellingSalesmanProblem::evaluate_fitness(const int *individual) {
     double route_distance = 0.0;
     for (int i = 0; i < this->problem_size - 1; ++i) {
         route_distance += this->cities[individual[i] + problem_size * individual[i+1]];		//matrix lookup for a distance between two cities
@@ -109,8 +107,8 @@ double TravellingSalesmanProblem::evaluate_fitness(int *individual) {
 }
 
 void TravellingSalesmanProblem::breed(int *parent1, int *parent2, int* child) {
-    int geneA = this->random_gene(gen);
-    int geneB = this->random_gene(gen);
+    int geneA = this->rand_range(0, this->problem_size - 1);
+    int geneB = this->rand_range(0, this->problem_size - 1);
     int startGene = min(geneA, geneB);
     int endGene = max(geneA, geneB);
 
@@ -146,8 +144,8 @@ void TravellingSalesmanProblem::breed_population() {
     // Breed any random individuals
     for (int i = this->elite_size; i < population_count; ++i) {
         this->breed(
-                this->population[random_individual(gen)],
-                this->population[random_individual(gen)],
+                this->population[this->rand_range(0, this->population_count - 1)],
+                this->population[this->rand_range(0, this->population_count - 1)],
                 temp_population[i]);
     }
 
@@ -159,23 +157,22 @@ void TravellingSalesmanProblem::breed_population() {
 }
 
 void TravellingSalesmanProblem::mutate(int *individual) {
-    int changes = nr_mutations(gen);
-    vector<int> tmp(this->population_count);
-    vector<int> swap, swap_with;
-    swap.reserve(changes);
-    swap_with.reserve(changes);
-    sample(tmp.begin(), tmp.end(), back_inserter(swap), changes, gen);
-    sample(tmp.begin(), tmp.end(), back_inserter(swap_with), changes, gen);
-    for (int i = 0; i < changes; ++i) {
-        int city1 = individual[swap[i]];
-        int city2 = individual[swap_with[i]];
-        individual[swap[i]] = city2;
-        individual[swap_with[i]] = city1;
+    if (rand() % this->mutation_rate == 0) {
+        int swap = rand_range(0, this->problem_size - 1);
+        int swap_with = rand_range(0, this->problem_size - 1);
+        int city1 = individual[swap];
+        int city2 = individual[swap_with];
+        individual[swap] = city2;
+        individual[swap_with] = city1;
     }
 }
 
 void TravellingSalesmanProblem::mutate_population() {
-    for (int i = 0; i < population_count; ++i) {
+    for (int i = this->elite_size / 2; i < population_count; ++i) {
         this->mutate(population[i]);
     }
+}
+
+int TravellingSalesmanProblem::rand_range(const int &a, const int&b) {
+    return (rand() % (b - a + 1) + a);
 }
