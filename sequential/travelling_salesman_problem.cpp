@@ -141,11 +141,20 @@ void TravellingSalesmanProblem::breed_population() {
         }
     }
 
+    vector<double> correct_fitness;
+    correct_fitness.reserve(this->population_count);
+    for (auto f : this->fitness) {
+        correct_fitness.push_back(1 / f);
+    }
+
+    //auto dist = std::uniform_int_distribution(0, population_count - 1);
+    auto dist = std::discrete_distribution(correct_fitness.begin(), correct_fitness.end());
+
     // Breed any random individuals
     for (int i = this->elite_size; i < population_count; ++i) {
         this->breed(
-                this->population[this->rand_range(0, this->population_count - 1)],
-                this->population[this->rand_range(0, this->population_count - 1)],
+                this->population[dist(gen)],
+                this->population[dist(gen)],
                 temp_population[i]);
     }
 
