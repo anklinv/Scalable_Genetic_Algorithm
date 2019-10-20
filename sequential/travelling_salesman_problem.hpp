@@ -38,6 +38,7 @@ public:
 
     /// Fitness of individuals. i-th element is the path length of i-th individual
     vector<double> fitness;
+    double fitness_sum;
 
     /// Sorted ranks of individuals. i-th element is the index of the i-th best individual
     vector<int> ranks;

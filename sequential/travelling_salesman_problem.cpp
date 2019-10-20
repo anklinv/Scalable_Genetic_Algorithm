@@ -88,8 +88,11 @@ double TravellingSalesmanProblem::solve(const int nr_epochs) {
 }
 
 void TravellingSalesmanProblem::rank_individuals() {
+    this->fitness_sum = 0.0;
     for (int i = 0; i < this->population_count; ++i) {
-        this->fitness[i] = this->evaluate_fitness(this->population[i]);
+        double fitness = this->evaluate_fitness(this->population[i]);
+        this->fitness[i] = fitness;
+        this->fitness_sum += fitness;
     }
     iota(this->ranks.begin(), this->ranks.end(), 0);
     sort(this->ranks.begin(), this->ranks.end(), [this] (int i, int j) {
@@ -144,18 +147,54 @@ void TravellingSalesmanProblem::breed_population() {
     vector<double> correct_fitness;
     correct_fitness.reserve(this->population_count);
     for (auto f : this->fitness) {
-        correct_fitness.push_back(1 / f);
+        correct_fitness.push_back(1 / pow(f / this->fitness_sum, 4));
     }
 
     //auto dist = std::uniform_int_distribution(0, population_count - 1);
     auto dist = std::discrete_distribution(correct_fitness.begin(), correct_fitness.end());
 
+    /*
+    int fittest_n = 6;
+    vector<int> pop(population_count);
+    iota(pop.begin(), pop.end(), 0);
+     */
+
     // Breed any random individuals
     for (int i = this->elite_size; i < population_count; ++i) {
+
+        /*
+        vector<int> tournament1, tournament2;
+        tournament1.reserve(fittest_n);
+        tournament2.reserve(fittest_n);
+        std::sample(pop.begin(), pop.end(), back_inserter(tournament1), fittest_n, gen);
+        std::sample(pop.begin(), pop.end(), back_inserter(tournament2), fittest_n, gen);
+        int best_t1;
+        double best_t1_fitness = INFINITY;
+        for (auto t1 : tournament1) {
+            if (this->fitness[t1] < best_t1_fitness) {
+                best_t1 = t1;
+                best_t1_fitness = this->fitness[t1];
+            }
+        }
+        int best_t2;
+        double best_t2_fitness = INFINITY;
+        for (auto t2 : tournament2) {
+            if (this->fitness[t2] < best_t2_fitness) {
+                best_t2 = t2;
+                best_t2_fitness = this->fitness[t2];
+            }
+        }
+        this->breed(
+                this->population[best_t1],
+                this->population[best_t2],
+                temp_population[i]);
+        */
+
         this->breed(
                 this->population[dist(gen)],
                 this->population[dist(gen)],
                 temp_population[i]);
+
     }
 
     for (int i = 0; i < this->population_count; ++i) {
