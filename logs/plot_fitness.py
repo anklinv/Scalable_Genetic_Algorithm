@@ -9,7 +9,7 @@ def plot_fitness_from_file(filename: str):
         csv_reader = csv.reader(file)
         for row in csv_reader:
             epoch.append(int(row[0]))
-            fitness.append(float(row[1]))
+            fitness.append([float(f) for f in row[1:]])
     plt.plot(epoch, fitness)
     plt.show()
 

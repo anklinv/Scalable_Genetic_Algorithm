@@ -28,6 +28,8 @@ void Logger::close() {
     this->fitness_file.close();
 }
 
-void Logger::log_best_fitness_per_epoch(int epoch, double fitness) {
-    this->fitness_file << epoch << ", " << fitness << std::endl;
+void Logger::log_best_fitness_per_epoch(int epoch, std::vector<double> fitness) {
+    this->fitness_file << epoch;
+    for (auto f : fitness) this->fitness_file << "," << f;
+    this->fitness_file << std::endl;
 }

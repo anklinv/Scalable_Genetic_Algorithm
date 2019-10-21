@@ -74,7 +74,7 @@ double TravellingSalesmanProblem::solve(const int nr_epochs) {
 
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
         this->evolve();
-        this->logger->log_best_fitness_per_epoch(epoch, this->fitness_best);
+        this->logger->log_best_fitness_per_epoch(epoch, this->fitness);
 #ifdef debug
         cout << "*** EPOCH " << epoch << " ***" << endl;
         rank_individuals();
@@ -92,7 +92,7 @@ double TravellingSalesmanProblem::solve(const int nr_epochs) {
     }
 
     this->rank_individuals();
-    this->logger->log_best_fitness_per_epoch(nr_epochs, this->fitness_best);
+    this->logger->log_best_fitness_per_epoch(nr_epochs, this->fitness);
 
     this->logger->close();
     

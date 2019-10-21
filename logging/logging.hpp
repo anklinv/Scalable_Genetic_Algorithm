@@ -2,6 +2,7 @@
 #define DPHPC_PROJECT_LOGGING_HPP
 
 #include <fstream>
+#include <vector>
 
 class Logger {
 public:
@@ -22,8 +23,11 @@ public:
 
     /// Store best fitness value after given number of epochs
     /// \param epoch number of finished epochs (0 means initialised)
-    /// \param fitness fitness value
-    void log_best_fitness_per_epoch(int epoch, double fitness);
+    /// \param fitness vector of fitness values
+    void log_best_fitness_per_epoch(
+        int epoch,
+        std::vector<double> fitness = std::vector<double>()
+    );
 
 protected:
     std::string filename_prefix;
