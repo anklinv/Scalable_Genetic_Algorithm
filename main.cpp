@@ -106,10 +106,11 @@ double setupAndRunGA(int rank) {
     // Read cities
     int number_cities = stoi(dimension);
     int node_edge_mat[number_cities * number_cities];
-    TravellingSalesmanProblem problem(number_cities, 100, 10, 16);
     cout << "Reading " << dimension << " cities of problem " << name << "... (rank " << rank << ")" << endl;
-    // Read city coordinates
+    // Instead of reading city coordinates here, load distance matrix from a preprocessed file
     input.close();
+
+    // Read city coordinates
     ifstream input2("data/att48.csv");
     
     for (int i = 0; i < number_cities; ++i) {
@@ -120,7 +121,7 @@ double setupAndRunGA(int rank) {
         }
         stringstream iss(line);
         
-	for (int j = 0; j < number_cities; ++j) {
+        for (int j = 0; j < number_cities; ++j) {
             string val;
             getline(iss, val, ';');
             if(!iss.good()){
@@ -130,9 +131,12 @@ double setupAndRunGA(int rank) {
             converter >> node_edge_mat[i + number_cities * j];
         }
     }
-    problem.cities = node_edge_mat;
     input2.close();
     cout << "Done!" << endl;
+
+    TravellingSalesmanProblem problem(number_cities, 100, 10, 16);
+    problem.set_logger(new Logger(rank));
+    problem.cities = node_edge_mat;
     
     // Solve problem
     double final_distance;

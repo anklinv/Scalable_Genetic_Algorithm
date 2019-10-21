@@ -1,7 +1,9 @@
-#include <vector>
-
 #ifndef DPHPC_PROJECT_TRAVELLING_SALESMAN_PROBLEM_HPP
 #define DPHPC_PROJECT_TRAVELLING_SALESMAN_PROBLEM_HPP
+
+#include <vector>
+
+#include "../logging/logging.hpp"
 
 using namespace std;
 
@@ -17,6 +19,7 @@ public:
     /// \param elite_size number of individuals that survive for sure
     /// \param mutation_rate 1/mutation_rate is the probability that an individual gets a mutation
     TravellingSalesmanProblem(int problem_size, int population_count, int elite_size, int mutation_rate);
+    ~TravellingSalesmanProblem();
 
     /// Number of nodes in the graph
     int problem_size;
@@ -33,12 +36,24 @@ public:
     /// 2D coordinates of the cities
     int* cities;
 
+    void set_logger(Logger *logger);
+
+    /// Solve the problem by evolving for a given number of steps.
+    /// \param nr_epochs number of steps to evolve
+    /// \return the best length of the best path found by the algorithm
+    double solve(int nr_epochs);
+
+private:
+    /// Logger object
+    Logger *logger;
+
     /// Pointer to the population indices, which has size population_count * problem_size
     int** population;
 
     /// Fitness of individuals. i-th element is the path length of i-th individual
     vector<double> fitness;
     double fitness_sum;
+    double fitness_best;
 
     /// Sorted ranks of individuals. i-th element is the index of the i-th best individual
     vector<int> ranks;
@@ -54,11 +69,6 @@ public:
 
     /// Run a single iteration of selection, breeding and mutation
     void evolve();
-
-    /// Solve the problem by evolving for a given number of steps.
-    /// \param nr_epochs number of steps to evolve
-    /// \return the best length of the best path found by the algorithm
-    double solve(int nr_epochs);
 
     /// Calculate the fitness of all individuals, save it in this->fitness and also calculate the ranks and save those
     /// in this->ranks
@@ -82,7 +92,6 @@ public:
     /// Apply mutation to the whole population
     void mutate_population();
 
-private:
     int rand_range(const int &a, const int&b);
 };
 

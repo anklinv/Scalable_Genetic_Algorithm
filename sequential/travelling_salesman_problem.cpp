@@ -1,8 +1,10 @@
-#include <random>
-#include <iostream>
-#include <cstdlib>
 #include <algorithm>
+#include <cstdlib>
+#include <iostream>
+#include <limits>
+#include <random>
 #include <set>
+
 #include "travelling_salesman_problem.hpp"
 
 using namespace std;
@@ -38,6 +40,14 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
     }
 }
 
+TravellingSalesmanProblem::~TravellingSalesmanProblem() {
+    if (this->logger) delete this->logger;
+}
+
+void TravellingSalesmanProblem::set_logger(Logger *logger) {
+    this->logger = logger;
+}
+
 void TravellingSalesmanProblem::evolve() {
     // Compute fitness
     this->rank_individuals();
@@ -49,12 +59,11 @@ void TravellingSalesmanProblem::evolve() {
     this->mutate_population();
 }
 
-
 double TravellingSalesmanProblem::solve(const int nr_epochs) {
-    this->rank_individuals();
-    double initial_distance = *min_element(this->fitness.begin(), this->fitness.end());
+    this->logger->open();
 
 #ifdef debug
+    this->rank_individuals();
     for (int i = 0; i < this->population_count; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             cout << this->population[i][j] << " ";
@@ -65,6 +74,7 @@ double TravellingSalesmanProblem::solve(const int nr_epochs) {
 
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
         this->evolve();
+        this->logger->log_best_fitness_per_epoch(epoch, this->fitness_best);
 #ifdef debug
         cout << "*** EPOCH " << epoch << " ***" << endl;
         rank_individuals();
@@ -82,17 +92,22 @@ double TravellingSalesmanProblem::solve(const int nr_epochs) {
     }
 
     this->rank_individuals();
-    double final_distance = *min_element(this->fitness.begin(), this->fitness.end());
+    this->logger->log_best_fitness_per_epoch(nr_epochs, this->fitness_best);
+
+    this->logger->close();
     
-    return final_distance;
+    return this->fitness_best;
 }
 
 void TravellingSalesmanProblem::rank_individuals() {
     this->fitness_sum = 0.0;
+    this->fitness_best = std::numeric_limits<typeof(this->fitness_best)>::max();
+
     for (int i = 0; i < this->population_count; ++i) {
         double fitness = this->evaluate_fitness(this->population[i]);
         this->fitness[i] = fitness;
         this->fitness_sum += fitness;
+        this->fitness_best = min(this->fitness_best, fitness);
     }
     iota(this->ranks.begin(), this->ranks.end(), 0);
     sort(this->ranks.begin(), this->ranks.end(), [this] (int i, int j) {
