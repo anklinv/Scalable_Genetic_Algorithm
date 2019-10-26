@@ -5,6 +5,9 @@
 using namespace std;
 
 
+/**
+ Facilitates sorting individuals during a migration step
+ */
 typedef struct Individual {
     
     int idx;
@@ -17,11 +20,15 @@ typedef struct Individual {
 } Individual;
 
 
-void swapArrays(int* arrA, int* arrB, int length) {
+/**
+ Helper function to swap the elements of two arrays
+ */
+template<class T>
+void swapArrays(T* arrA, T* arrB, int length) {
     
     for(int idx = 0; idx < length; idx++) {
         
-        int tmp = arrA[idx];
+        T tmp = arrA[idx];
         arrA[idx] = arrB[idx];
         arrB[idx] = tmp;
     }
@@ -29,14 +36,17 @@ void swapArrays(int* arrA, int* arrB, int length) {
 }
 
 
-Island(TravellingSalesmanProblem* tsp, int migrationPeriod, int migrationAmount,
-       int numPeriods) {
+/**
+ Helper function to copy the elements of an array to another one
+ */
+template<class T>
+void copyArray(T* source, T* destination, int length) {
     
-    this->tsp = tsp;
+    for(int idx = 0; idx < length; idx++) {
+        
+        destination[idx] = source[idx];
+    }
     
-    this->migrationPeriod = migrationPeriod;
-    this->migrationAmount = migrationAmount;
-    this->numPeriods = numPeriods;
 }
 
 

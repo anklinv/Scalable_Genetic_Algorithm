@@ -1,36 +1,38 @@
+#ifndef DPHPC_PROJECT_ISLAND_HPP
+#define DPHPC_PROJECT_ISLAND_HPP
 
 #include "mpi.h" /* requirement for MPI */
 
 #include "travelling_salesman_problem.hpp"
 
-/**
- An Island wraps around a TravellingSalesmanProblem
- - Fitness evaluation (Ceval) and cross-over / mutation (Coper) is done
-  by the underlying TSP
- - The Island does the communication (Ccomm)
- */
-
-/**
- Idea: consider making Island a subclass of TravellingSalesmanProblem
- - change the access modifier of important fields to protected
- */
 
 class Island {
     
 public:
     
     /**
-     - Get the parameters for the underlying TSP
-     - Get frequency, extent
-     */
-    Island(TravellingSalesmanProblem* tsp, int migrationPeriod, int migrationAmount);
-    
-    enum Topology {
-        FULLY_CONNECTED;
-    }
+     An Island wraps around a TravellingSalesmanProblem
+     - Fitness evaluation (C_eval) , cross-over and mutation (C_oper) are done by the underlying TSP
+     - The Island adds communication (C_comm)  and performs selection and replacement in this context (C_oper)
+     
+     \param numTSPNodes number of nodes in the graph (TSP)
+     \param populationSize size of the population (TSP)
+     \param eliteSize number of individuals that survive for sure (TSP)
+     \param mutationRate 1/mutationRate is the probability that an individual gets a mutation (TSP)
+     \param migrationPeriod the amount of iterations between two migration steps
+     \param migrationAmount the number of individuals each island sends to all others
+     \param numPeriods numPeriods * migrationPeriod yields the total number of iterations
+    */
+    Island(int numTSPNodes, int populationSize, int eliteSize, int mutationRate,
+           int migrationPeriod, int migrationAmount, int numPeriods):
+    tsp(numTSPNodes, populationSize, eliteSize, mutationRate),
+    migrationPeriod(migrationPeriod),
+    migrationAmount(migrationAmount),
+    numPeriods(numPeriods) {}
     
     /**
-     Run the GA
+     Executes the GA on the current rank. Because of MPI_Allgather it is necessary that all ranks in MPI_COMM_WORLD
+     execute the GA simultaneously.
      */
     double solve();
     
@@ -38,15 +40,25 @@ public:
 private:
     
     /**
-     Use a pointer to avoid dealing with object initialization
+     The aggregated TravellingSalesmanProblem
      */
-    TravellingSalesmanProblem* tsp;
+    TravellingSalesmanProblem tsp;
     
+    /**
+     The amount of iterations of the algorithm between two migration steps
+     */
     int migrationPeriod;
+    
+    /**
+     The amount of individuals each island sends to all other islands
+     */
     int migrationAmount;
     
-    void send();
-    void receiveAll();
+    /**
+     The number of migration periods. The overall number of iterations is given by numPeriods * migrationPeriod.
+     */
+    int numPeriods;
     
-}
+};
 
+#endif //DPHPC_PROJECT_ISLAND_HPP
