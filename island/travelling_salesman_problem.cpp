@@ -11,7 +11,8 @@ using namespace std;
 
 TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, const int population_count,
         const int elite_size, const int mutation_rate) {
-    this->problem_size = problem_size;
+    
+    this->problem_size = problem_size; // number of nodes of the TSP graph
     this->population_count = population_count;
     this->elite_size = elite_size;
     this->mutation_rate = mutation_rate;
@@ -38,6 +39,17 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
             this->population[i][j] = tmp_indices[j];
         }
     }
+}
+
+TravellingSalesmanProblem::TravellingSalesmanProblem(TravellingSalesmanProblem tsp) {
+    
+    this->problem_size = tsp.problem_size;
+    this->population_count = tsp.population_count;
+    this->elite_size = tsp.elite_size;
+    this->mutation_rate = tsp.mutation_rate;
+    
+    // TODO: finish the implementation of this copy constructor
+    
 }
 
 TravellingSalesmanProblem::~TravellingSalesmanProblem() {
@@ -239,3 +251,21 @@ void TravellingSalesmanProblem::mutate_population() {
 int TravellingSalesmanProblem::rand_range(const int &a, const int&b) {
     return (rand() % (b - a + 1) + a);
 }
+
+vector<int> getRanks() {
+    return ranks;
+}
+
+double getFitness(int individualIndex) {
+    return fitnes[individualIndex];
+}
+
+int* getGenes(int individualIndex) {
+    return population[individualIndex];
+}
+
+void setFitness(int individualIndex, double fitness) {
+    (this->fitness)[individualIndex] = fitness;
+}
+
+
