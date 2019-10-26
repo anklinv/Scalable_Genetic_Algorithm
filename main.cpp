@@ -21,7 +21,7 @@ typedef vector<double> vec_d;
 
 // constants
 const int DATA_TAG = 0x011;
-
+const int THREADS_PER_ISLAND = 2;
 
 double setupAndRunGA(int rank);
 
@@ -39,7 +39,11 @@ int main(int argc, char** argv) {
     
     
     // reads the graph from a file and runs the GA
+    auto start = chrono::high_resolution_clock::now();
     double final_distance = setupAndRunGA(rank);
+    auto stop = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+    cout << duration.count() << " ms total runtime (rank " << rank << ")" << endl;
     
     if (rank != 0) {
         
@@ -140,7 +144,7 @@ double setupAndRunGA(int rank) {
     
     // Solve problem
     double final_distance;
-    final_distance = problem.solve(1000);
+    final_distance = problem.solve(1000, rank);
     cout << "Final distance is " << final_distance << " (rank " << rank << ")" << endl;
     
     // TODO: Graph, maybe visualization

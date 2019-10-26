@@ -48,18 +48,31 @@ void TravellingSalesmanProblem::set_logger(Logger *logger) {
     this->logger = logger;
 }
 
-void TravellingSalesmanProblem::evolve() {
+void TravellingSalesmanProblem::evolve(const int rank) {
     // Compute fitness
+    auto start = chrono::high_resolution_clock::now();
     this->rank_individuals();
-
+    auto stop = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::microseconds>(stop - start);
+    cout << "\t\tRanking takes: " << duration.count() << "us (rank " << rank << ")" << endl;
+    
     // Breed children
+    start = chrono::high_resolution_clock::now();
     this->breed_population();
+    stop = chrono::high_resolution_clock::now();
+    duration = chrono::duration_cast<chrono::microseconds>(stop - start);
+    cout << "\t\tBreeding takes: " << duration.count() << "us (rank " << rank << ")" << endl;
 
     // Mutate population
+    start = chrono::high_resolution_clock::now();
     this->mutate_population();
+    stop = chrono::high_resolution_clock::now();
+    duration = chrono::duration_cast<chrono::microseconds>(stop - start);
+    cout << "\t\tMutation takes: " << duration.count() << "us (rank " << rank << ")" << endl;
 }
 
-double TravellingSalesmanProblem::solve(const int nr_epochs) {
+double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
+    
     this->logger->open();
 
 #ifdef debug
@@ -73,7 +86,8 @@ double TravellingSalesmanProblem::solve(const int nr_epochs) {
 #endif
 
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
-        this->evolve();
+        auto start = chrono::high_resolution_clock::now();
+        this->evolve(rank);
         this->logger->log_best_fitness_per_epoch(epoch, this->fitness);
 #ifdef debug
         cout << "*** EPOCH " << epoch << " ***" << endl;
@@ -82,20 +96,22 @@ double TravellingSalesmanProblem::solve(const int nr_epochs) {
             for (int j = 0; j < this->problem_size; ++j) {
                 cout << this->population[i][j] << " ";
             }
-            cout << "\tfit: " << this->fitness[i];
+            cout << "\tfit: " << this->fitness[i] << " rank: " << rank;
             if (this->ranks[0] == i) {
                 cout << "*";
             }
             cout << endl;
         }
 #endif
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::microseconds>(stop - start);
+        cout << "\t" << duration.count() << " us epoch runtime (epoch " << epoch << " rank " << rank << ")" << endl;
     }
 
     this->rank_individuals();
     this->logger->log_best_fitness_per_epoch(nr_epochs, this->fitness);
 
     this->logger->close();
-    
     return this->fitness_best;
 }
 
@@ -124,18 +140,26 @@ double TravellingSalesmanProblem::evaluate_fitness(const int *individual) {
     return route_distance;
 }
 
+//this function takes up the most time in an epoch
+//possible solutions:
+//  * take 50% of each parent as opposed to randomly taking a sequence
+//  *
 void TravellingSalesmanProblem::breed(int *parent1, int *parent2, int* child) {
+    //selecting gene sequences to be carried over to child
     int geneA = this->rand_range(0, this->problem_size - 1);
     int geneB = this->rand_range(0, this->problem_size - 1);
     int startGene = min(geneA, geneB);
     int endGene = max(geneA, geneB);
 
+    //performing the carry over from parent 1 to child
     set<int> selected;
     for (int i = startGene; i <= endGene; ++i) {
         child[i] = parent1[i];
         selected.insert(parent1[i]);
     }
 
+    //filling rest of child with parent 2
+    //this is the culprit (lots of conditional statements)
     int index = 0;
     for (int i = 0; i < this->problem_size; ++i) {
         // If not already chosen that city

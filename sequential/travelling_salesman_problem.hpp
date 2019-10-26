@@ -41,7 +41,7 @@ public:
     /// Solve the problem by evolving for a given number of steps.
     /// \param nr_epochs number of steps to evolve
     /// \return the best length of the best path found by the algorithm
-    double solve(int nr_epochs);
+    double solve(int nr_epochs, int rank);
 
 private:
     /// Logger object
@@ -68,7 +68,7 @@ private:
     double evaluate_fitness(const int* individual);
 
     /// Run a single iteration of selection, breeding and mutation
-    void evolve();
+    void evolve(int rank);
 
     /// Calculate the fitness of all individuals, save it in this->fitness and also calculate the ranks and save those
     /// in this->ranks
