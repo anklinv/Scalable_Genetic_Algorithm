@@ -12,6 +12,36 @@ Compile the program:
 Run the program:
 `mpiexec -np <number of processes> ./Distributed_Genetic_Algorithm`
 
+## How to run on leonhard
+#### Load C++ compiler
+```module load gcc/8.2.0```
+#### Load MPI
+```module load openmpi/4.0.1```
+#### Compile
+```mpiCC main.cpp sequential/travelling_salesman_problem.cpp logging/logging.cpp```
+#### Test if it works
+Do not do this exessively as it runs on the login node. Just use for sanity check.
+```mpirun -np 2 ./Distributed_Genetic_Algorithm```
+#### Submit job
+Use the following command to submit a job on Leonhard:
+
+```bsub -n 4 -W 00:10 -o log_test -R "rusage[mem=1024]" mpirun ./Distributed_Genetic_Algorithm```
+
+`-n` specifies the number of cores to use. Note: in the mpirun call you do not need to actually specify `-np`.
+
+`-W 00:10` specifies that we want to run it for at most 10 minutes (after which the process gets killed). As we should not submit jobs that run longer than 30 minutes, keep this at most at `00:30`, but if the value is lower it might get scheduled faster.
+
+`-o log_test` specifies the name of the logfile. If unspecified then the cluster will create a cryptic name.
+
+`-R "rusage[mem=1024]"` specifies how much memory is used PER CORE.
+
+#### Look at all jobs
+`bjobs -a` lists all jobs for that user. You can also use `bbjobs -a` to get more information.
+#### Peek at the output (possible as soon as the job is running)
+`bpeek -f` shows the console output of the job (if only one is active you do not need to specify the job-id)
+#### Read the logfile
+`vi log_test`
+
  # Setup
 
  ### Justin's setup:
