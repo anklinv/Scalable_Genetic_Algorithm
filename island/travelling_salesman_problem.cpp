@@ -252,16 +252,16 @@ int TravellingSalesmanProblem::rand_range(const int &a, const int&b) {
     return (rand() % (b - a + 1) + a);
 }
 
-vector<int> getRanks() {
+int* getRanks() {
     return ranks;
 }
 
-double getFitness(int individualIndex) {
-    return fitnes[individualIndex];
+double getFitness(int indivIdx) {
+    return fitness[indivIdx];
 }
 
-int* getGenes(int individualIndex) {
-    return population[individualIndex];
+int* getGene(int indivIdx) {
+    return population[indivIdx];
 }
 
 void setFitness(int individualIndex, double fitness) {

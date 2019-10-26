@@ -6,6 +6,51 @@
 #include "travelling_salesman_problem.hpp"
 
 
+/**
+ Facilitates sorting individuals during a migration step
+ */
+typedef struct Individual {
+    
+    int idx;
+    double fitness;
+    
+    bool operator<(const Individual& other) const {
+        this->fitness < other.fitness;
+    }
+    
+} Individual;
+
+
+/**
+ Helper function to swap the elements of two arrays
+ */
+template<class T>
+void swapArrays(T* arrA, T* arrB, int length) {
+    
+    for(int idx = 0; idx < length; idx++) {
+        
+        T tmp = arrA[idx];
+        arrA[idx] = arrB[idx];
+        arrB[idx] = tmp;
+    }
+    
+}
+
+
+/**
+ Helper function to copy the elements of an array to another one
+ */
+template<class T>
+void copyArray(T* source, T* destination, int length) {
+    
+    for(int idx = 0; idx < length; idx++) {
+        
+        destination[idx] = source[idx];
+    }
+    
+}
+
+
 class Island {
     
 public:
@@ -33,6 +78,7 @@ public:
     /**
      Executes the GA on the current rank. Because of MPI_Allgather it is necessary that all ranks in MPI_COMM_WORLD
      execute the GA simultaneously.
+     \return the length of the shortest path found by the algorithm
      */
     double solve();
     

@@ -48,16 +48,19 @@ public:
     double solve(int nr_epochs);
     
     /// Getter method to access the ranks after the execution of the algorithm
-    vector<int> getRanks();
+    int* getRanks();
     
     /// Getter method to access the fitness of a single individual
-    double getFitness(int individualIndex);
+    double getFitness(int indivIdx);
+    
+    /// Getter method to access the "gene" of a single individual
+    int* getGene(int indivIdx);
+    
     
     /// Sets the fitness of a single individual
     void setFitness(int individualIndex, double fitness);
     
-    /// Getter method to access the "genes" of a single individual
-    int* getGenes(int individualIndex);
+    
     
     /// Getter method to access the fitnesses after the execution of the algorithm
     vector<double> getFitness();
@@ -79,7 +82,7 @@ private:
     double fitness_best;
 
     /// Sorted ranks of individuals. i-th element is the index of the i-th best individual
-    vector<int> ranks;
+    int* ranks;
 
     /// For randomness
     std::random_device rd;
