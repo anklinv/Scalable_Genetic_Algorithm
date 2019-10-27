@@ -37,7 +37,7 @@ double Island::solve() {
             sendBufferFitness[indivIdx] = (this->tsp).getFitness(ranks[indivIdx]);
             
             
-            int* gene = getGene(ranks[indivIdx]);
+            int* gene = (this->tsp).getGene(ranks[indivIdx]);
             
             for(int nodeIdx = 0; nodeIdx < numNodes; nodeIdx++) {
                 sendBufferGenes[(indivIdx * numNodes) + nodeIdx] = gene[nodeIdx];
@@ -70,7 +70,7 @@ double Island::solve() {
         for(int indivIdx = 0; indivIdx < migrationAmount * numProcesses; indivIdx++) {
             
             (incomingIndividuals[indivIdx]).idx = indivIdx;
-            (incomingIndividuals[indivIdx]).fitness = fitnessReceive[indivIdx];
+            (incomingIndividuals[indivIdx]).fitness = receiveBufferFitness[indivIdx];
         }
         
         // Sort the incoming data in ascending order
@@ -85,8 +85,8 @@ double Island::solve() {
         for(int indivIdx = numIndivsIsland - (migrationAmount * numProcesses);
             indivIdx < numIndivsIsland; indivIdx++) {
             
-            (worstIslandIndividuals[helperIdx]).idx = ranks[idx];
-            (worstIslandIndividuals[helperIdx]).fitness = getFitness(ranks[idx]);
+            (worstIslandIndividuals[helperIdx]).idx = ranks[indivIdx];
+            (worstIslandIndividuals[helperIdx]).fitness = (this->tsp).getFitness(ranks[indivIdx]);
             
             helperIdx++;
         }
@@ -100,8 +100,8 @@ double Island::solve() {
         
         while(idxIncoming < migrationAmount * numProcesses && idxIsland < migrationAmount * numProcesses) {
             
-            currFitnessIncoming = (incomingIndividuals[idxIncoming]).fitness;
-            currFitnessIsland = (worstIslandIndividuals[idxIsland]).fitness;
+            double currFitnessIncoming = (incomingIndividuals[idxIncoming]).fitness;
+            double currFitnessIsland = (worstIslandIndividuals[idxIsland]).fitness;
             
             if(currFitnessIncoming < currFitnessIsland) { // incoming individual is better
                 
@@ -121,12 +121,12 @@ double Island::solve() {
         // - the ranks stored in the TSP object are no longer correct after this step
         for(int indivIdx = 0; indivIdx < numReplaced; indivIdx++) {
             
-            int* currGene = getGene(ranks[(numIndividualsIsland - 1) - indivIdx]);
-            int* newGene = receiveBufferGenes[incomingIndividuals[indivIdx].idx * numNodes];
+            int* currGene = (this->tsp).getGene(ranks[(numIndivsIsland - 1) - indivIdx]);
+            int* newGene = &receiveBufferGenes[incomingIndividuals[indivIdx].idx * numNodes];
             
             copyArray(newGene, currGene, numNodes);
             
-            (this->tsp).setFitness(ranks[(numIndividualsIsland - 1) - indivIdx],
+            (this->tsp).setFitness(ranks[(numIndivsIsland - 1) - indivIdx],
                                    incomingIndividuals[indivIdx].fitness);
         }
         

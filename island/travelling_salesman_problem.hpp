@@ -1,6 +1,12 @@
 #ifndef DPHPC_PROJECT_TRAVELLING_SALESMAN_PROBLEM_HPP
 #define DPHPC_PROJECT_TRAVELLING_SALESMAN_PROBLEM_HPP
 
+#include <algorithm>
+#include <cstdlib>
+#include <iostream>
+#include <limits>
+#include <random>
+#include <set>
 #include <vector>
 
 #include "../logging/logging.hpp"
@@ -19,9 +25,6 @@ public:
     /// \param elite_size number of individuals that survive for sure
     /// \param mutation_rate 1/mutation_rate is the probability that an individual gets a mutation
     TravellingSalesmanProblem(int problem_size, int population_count, int elite_size, int mutation_rate);
-    
-    /// Copy constructor
-    TravellingSalesmanProblem(TravellingSalesmanProblem tsp);
     
     ~TravellingSalesmanProblem();
 

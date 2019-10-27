@@ -5,36 +5,19 @@
 #include <stdlib.h>
 
 #include "travelling_salesman_problem.hpp"
-
+#include "island.hpp"
 
 using namespace std;
 
 
-/* global parameters for the GA:
- *
- * - frequency
- * - extent
- * - selection policy (source)
- * - replacement policy (target)
- * - topology
- */
-
-
-
-
-
-
 int main(int argc, char** argv) {
 
-    int rank;
-    
-    
     MPI_Init(&argc, &argv); /* requirement for MPI */
 
     
     // execution of the GA
     
-    
+    int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
     if (rank != 0) {

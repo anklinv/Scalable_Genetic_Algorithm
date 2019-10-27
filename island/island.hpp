@@ -17,7 +17,7 @@ typedef struct Individual {
     double fitness;
     
     bool operator<(const Individual& other) const {
-        this->fitness < other.fitness;
+        return (this->fitness) < other.fitness;
     }
     
 } Individual;

@@ -1,9 +1,3 @@
-#include <algorithm>
-#include <cstdlib>
-#include <iostream>
-#include <limits>
-#include <random>
-#include <set>
 
 #include "travelling_salesman_problem.hpp"
 
@@ -17,7 +11,7 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
     this->elite_size = elite_size;
     this->mutation_rate = mutation_rate;
     this->fitness = vector<double>(population_count, 0.0);
-    this->ranks = vector<int>(population_count);
+    this->ranks = new int[population_count];
     this->cities = new int[problem_size * problem_size];
     this->gen = mt19937(this->rd());
 
@@ -39,17 +33,6 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
             this->population[i][j] = tmp_indices[j];
         }
     }
-}
-
-TravellingSalesmanProblem::TravellingSalesmanProblem(TravellingSalesmanProblem tsp) {
-    
-    this->problem_size = tsp.problem_size;
-    this->population_count = tsp.population_count;
-    this->elite_size = tsp.elite_size;
-    this->mutation_rate = tsp.mutation_rate;
-    
-    // TODO: finish the implementation of this copy constructor
-    
 }
 
 TravellingSalesmanProblem::~TravellingSalesmanProblem() {
@@ -121,8 +104,8 @@ void TravellingSalesmanProblem::rank_individuals() {
         this->fitness_sum += fitness;
         this->fitness_best = min(this->fitness_best, fitness);
     }
-    iota(this->ranks.begin(), this->ranks.end(), 0);
-    sort(this->ranks.begin(), this->ranks.end(), [this] (int i, int j) {
+    iota(this->ranks, this->ranks + population_count, 0);
+    sort(this->ranks, this->ranks + population_count, [this] (int i, int j) {
        return this->fitness[i] < this->fitness[j];
     });
 }
@@ -265,7 +248,7 @@ void TravellingSalesmanProblem::setFitness(int indivIdx, double fitness) {
 }
 
 double TravellingSalesmanProblem::getMaxFitness() {
-    return max_element((this->fitness).begin(), (this->fitness).end());
+    return *max_element((this->fitness).begin(), (this->fitness).end());
 }
 
 int* TravellingSalesmanProblem::getGene(int indivIdx) {
