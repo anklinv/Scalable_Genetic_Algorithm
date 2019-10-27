@@ -11,6 +11,7 @@
 #include <sstream>
 
 #include "sequential/travelling_salesman_problem.hpp"
+#include "island/island.hpp"
 
 
 using namespace std;
@@ -37,40 +38,117 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
+    // settings
+    bool runSequential = true;
+    bool runIsland = false;
     
-    // reads the graph from a file and runs the GA
-    double final_distance = setupAndRunGA(rank);
     
-    if (rank != 0) {
+    if(runSequential == true) {
+    
+        // reads the graph from a file and runs the GA
+        double final_distance = setupAndRunGA(rank);
         
-        // send result to rank 0
-        MPI_Send(&final_distance, 1, MPI_DOUBLE, 0, DATA_TAG, MPI_COMM_WORLD);
-        
-    } else {
-        
-        int numProcesses;
-        MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
-        
-        double buff;
-        
-        vec_d all_dists;
-        all_dists.push_back(final_distance);
-        
-        // receive results from all other ranks
-        for(int i = 0; i < numProcesses - 1; i++) {
+        if (rank != 0) {
             
-            MPI_Recv(&buff, 1, MPI_DOUBLE, MPI_ANY_SOURCE, DATA_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // send result to rank 0
+            MPI_Send(&final_distance, 1, MPI_DOUBLE, 0, DATA_TAG, MPI_COMM_WORLD);
             
-            all_dists.push_back(buff);
-            final_distance = min(buff, final_distance);
+        } else {
+            
+            int numProcesses;
+            MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
+            
+            double buff;
+            
+            vec_d all_dists;
+            all_dists.push_back(final_distance);
+            
+            // receive results from all other ranks
+            for(int i = 0; i < numProcesses - 1; i++) {
+                
+                MPI_Recv(&buff, 1, MPI_DOUBLE, MPI_ANY_SOURCE, DATA_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                
+                all_dists.push_back(buff);
+                final_distance = min(buff, final_distance);
+            }
+            
+            double mean = computeMean(all_dists);
+            double stddev = computeStdDev(all_dists);
+            
+            cout << "Best final distance overall is " << final_distance << endl;
+            cout << "(mean is " << mean << ", std dev is " << stddev << ")" << endl;
         }
         
-        double mean = computeMean(all_dists);
-        double stddev = computeStdDev(all_dists);
+    } // end runSequential
+    
+    
+    if(runIsland == true) {
         
-        cout << "Best final distance overall is " << final_distance << endl;
-        cout << "(mean is " << mean << ", std dev is " << stddev << ")" << endl;
-    }
+        // TODO: Make this nicer, the files are not as consistent as I hoped.
+        //       The files can be found at http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsp/index.html
+        ifstream input("data/att48.tsp");
+        string name, comment, type, dimension, edge_weight_type, node;
+        
+        getline(input, name);
+        name = name.substr(7, name.length());
+        
+        getline(input, comment);
+        comment = comment.substr(10, comment.length());
+        
+        getline(input, type);
+        type = type.substr(7, type.length());
+        
+        getline(input, dimension);
+        dimension = dimension.substr(12, dimension.length());
+        
+        getline(input, edge_weight_type);
+        edge_weight_type = edge_weight_type.substr(18, edge_weight_type.length());
+        
+        getline(input, node);
+        
+        // Read cities
+        int number_cities = stoi(dimension);
+        int node_edge_mat[number_cities * number_cities];
+        cout << "Reading " << dimension << " cities of problem " << name << "... (rank " << rank << ")" << endl;
+        // Instead of reading city coordinates here, load distance matrix from a preprocessed file
+        input.close();
+
+        // Read city coordinates
+        ifstream input2("data/att48.csv");
+        
+        for (int i = 0; i < number_cities; ++i) {
+            string line;
+            getline(input2, line);
+            if(!input2.good()){
+                break;
+            }
+            stringstream iss(line);
+            
+            for (int j = 0; j < number_cities; ++j) {
+                string val;
+                getline(iss, val, ';');
+                if(!iss.good()){
+                    break;
+                }
+                stringstream converter(val);
+                converter >> node_edge_mat[i + number_cities * j];
+            }
+        }
+        input2.close();
+        cout << "Done!" << endl;
+
+        TravellingSalesmanProblem problem(number_cities, 100, 10, 16);
+        problem.set_logger(new Logger(rank));
+        problem.cities = node_edge_mat;
+        
+        // 1000 epochs is def
+        Island island(&problem, 200, 5, 5); // period, amount, numPeriods
+        double bestDistance = island.solve();
+        
+        if(rank == 0) {
+            cout << "Best final distance overall is " << bestDistance << endl;
+        }
+    } // end runIsland
     
     
     MPI_Finalize(); /* requirement for MPI */
@@ -170,4 +248,5 @@ double computeMean(vec_d data) {
     double sum = accumulate(data.begin(), data.end(), 0.0);
     return sum / data.size();
 }
+
 
