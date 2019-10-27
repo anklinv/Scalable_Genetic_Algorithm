@@ -252,20 +252,24 @@ int TravellingSalesmanProblem::rand_range(const int &a, const int&b) {
     return (rand() % (b - a + 1) + a);
 }
 
-int* getRanks() {
-    return ranks;
+int* TravellingSalesmanProblem::getRanks() {
+    return (this->ranks);
 }
 
-double getFitness(int indivIdx) {
-    return fitness[indivIdx];
+double TravellingSalesmanProblem::getFitness(int indivIdx) {
+    return (this->fitness)[indivIdx];
 }
 
-int* getGene(int indivIdx) {
-    return population[indivIdx];
+void TravellingSalesmanProblem::setFitness(int indivIdx, double fitness) {
+    (this->fitness)[indivIdx] = fitness;
 }
 
-void setFitness(int individualIndex, double fitness) {
-    (this->fitness)[individualIndex] = fitness;
+double TravellingSalesmanProblem::getMaxFitness() {
+    return max_element((this->fitness).begin(), (this->fitness).end());
+}
+
+int* TravellingSalesmanProblem::getGene(int indivIdx) {
+    return (this->population)[indivIdx];
 }
 
 

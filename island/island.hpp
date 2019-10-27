@@ -3,6 +3,8 @@
 
 #include "mpi.h" /* requirement for MPI */
 
+#include <algorithm>
+
 #include "travelling_salesman_problem.hpp"
 
 

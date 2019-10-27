@@ -15,24 +15,19 @@ double Island::solve() {
     // Local helper variables for convenience
     int numNodes = (this->tsp).problem_size;
     int numIntsGene = numNodes;
-    
-    
-    int migrationPeriod = this->migrationPeriod;
     int migrationAmount = this->migrationAmount;
-    int numPeriods = this->numPeriods;
-    TravellingSalesmanProblem* tsp = this->tsp;
-    int numIndividualsIsland = tsp.population_count;
+    int numIndivsIsland = (this->tsp).population_count;
     
     
-    for(int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
+    for(int currPeriod = 0; currPeriod < this->numPeriods; currPeriod++) {
         
         // Run the GA for migrationPeriod iterations
-        (this->tsp).solve(migrationPeriod);
+        (this->tsp).solve(this->migrationPeriod);
         
         
         // Set up buffers for sending data
-        double* sendBufferFitness[migrationAmount];
-        int* sendBufferGenes[migrationAmount * numIntsGene];
+        double sendBufferFitness[migrationAmount];
+        int sendBufferGenes[migrationAmount * numIntsGene];
         
         
         int* ranks = (this->tsp).getRanks();
@@ -52,54 +47,52 @@ double Island::solve() {
         
         
         // Set up buffers for receiving data
-        int sizeGeneReceive = migrationAmount * (tsp->problem_size) * numProcesses;
-        int sizeFitnessReceive = migrationAmount * numProcesses;
-        
-        int geneReceive[sizeGeneReceive];
-        double fitnessReceive[sizeFitnessReceive];
+        double receiveBufferFitness[migrationAmount * numProcesses];
+        int receiveBufferGenes[migrationAmount * numNodes * numProcesses];
         
         
         // "Gathers data from all tasks and distribute the combined data to all tasks"
-        // I suppose this is synchronous
+        // I suppose this is synchronized
+        MPI_Allgather(sendBufferFitness, migrationAmount, MPI_DOUBLE,
+                      receiveBufferFitness, migrationAmount * numProcesses, MPI_DOUBLE, MPI_COMM_WORLD);
         
-        MPI_Allgather(geneBuffer, migrationAmount * (tsp->problem_size), MPI_INT,
-                      geneReceive, migrationAmount * (tsp-problem_size) * numProcesses, MPI_INT, MPI_COMM_WORLD);
-        
-        MPI_Allgather(fitnessBuffer, migrationAmount, MPI_DOUBLE,
-                      fitnessReceive, migrationAmount * numProcesses, MPI_INT, MPI_COMM_WORLD);
+        MPI_Allgather(sendBufferGenes, migrationAmount * numNodes, MPI_INT,
+                      receiveBufferGenes, migrationAmount * numNodes * numProcesses, MPI_INT, MPI_COMM_WORLD);
         
         
-        // assemble result
-        // - this maybe is computationally expensive
-        // - there is some redundancy as the process is receiving its own data -> fix this
-        // - this is an attempt to implement this more or less efficiently
+        // Assemble result
+        // - there is some redundancy as the process is receiving its own data
+        // - this is an attempt to solve this more or less efficiently
         
-        // use (idx, fitness) pairs
+        // Use (idx, fitness) pairs to facilitate sorting
         Individual incomingIndividuals[migrationAmount * numProcesses];
         
-        for(int idx = 0; idx < migrationAmount * numProcesses; idx++) {
+        for(int indivIdx = 0; indivIdx < migrationAmount * numProcesses; indivIdx++) {
             
-            incomingIndividuals.idx = idx;
-            incomingIndividuals.fitness = fitnessReceive[idx];
+            (incomingIndividuals[indivIdx]).idx = indivIdx;
+            (incomingIndividuals[indivIdx]).fitness = fitnessReceive[indivIdx];
         }
         
-        // sort the incoming data in ascending order
+        // Sort the incoming data in ascending order
         // (the data at the current island is already sorted)
         sort(incomingIndividuals, incomingIndividuals + (migrationAmount * numProcesses));
         
         
-        // use (idx, fitness) pairs
+        // Use (idx, fitness) pairs
         Individual worstIslandIndividuals[migrationAmount * numProcesses];
+        int helperIdx = 0;
         
-        for(int idx = (numIndividualsIsland - 1) - (migrationAmount * numProcesses);
-            idx <= numIndividualsIsland - 1; idx++) {
+        for(int indivIdx = numIndivsIsland - (migrationAmount * numProcesses);
+            indivIdx < numIndivsIsland; indivIdx++) {
             
-            worstIslandIndividuals.idx = ranks[idx];
-            worstIslandIndividuals.fitness = getFitness(ranks[idx]);
+            (worstIslandIndividuals[helperIdx]).idx = ranks[idx];
+            (worstIslandIndividuals[helperIdx]).fitness = getFitness(ranks[idx]);
+            
+            helperIdx++;
         }
         
-        // determine how many individuals are going to be replaced
-        // once this is determined, just throw out the numReplaced weakest individuals of the island
+        
+        // Determine how many individuals are going to be replaced
         int numReplaced = 0;
         
         int idxIncoming = 0;
@@ -107,8 +100,8 @@ double Island::solve() {
         
         while(idxIncoming < migrationAmount * numProcesses && idxIsland < migrationAmount * numProcesses) {
             
-            currFitnessIncoming = incomingIndividuals[idx].fitness;
-            currFitnessIsland = worstIslandIndividuals[idx].fitness;
+            currFitnessIncoming = (incomingIndividuals[idxIncoming]).fitness;
+            currFitnessIsland = (worstIslandIndividuals[idxIsland]).fitness;
             
             if(currFitnessIncoming < currFitnessIsland) { // incoming individual is better
                 
@@ -117,30 +110,31 @@ double Island::solve() {
                 idxIncoming++;
                 idxIsland++;
                 
-            } else { // individual at island is better
+            } else { // island individual is better
                 
                 idxIsland++;
             }
         }
         
-        // the "throwing out" is done by just replacing the genes of the corresponding individuals
+        // Just throw out the numReplaced weakest individuals of the island
         // - the fitness is updated too
         // - the ranks stored in the TSP object are no longer correct after this step
-        for(int idx = 0; idx < numReplaced; idx++) {
+        for(int indivIdx = 0; indivIdx < numReplaced; indivIdx++) {
             
-            int* currGenes = getGenes(ranks[(numIndividualsIsland - 1) - idx]);
-            int* newGenes = geneReceive[incomingIndividuals[idx].idx * numNodes]; // not sure if this is correct
+            int* currGene = getGene(ranks[(numIndividualsIsland - 1) - indivIdx]);
+            int* newGene = receiveBufferGenes[incomingIndividuals[indivIdx].idx * numNodes];
             
-            swapArrays(currGenes, newGenes, numNodes);
+            copyArray(newGene, currGene, numNodes);
             
-            // not sure if this is correct
-            tsp.setFitness(ranks[(numIndividualsIsland - 1) - idx], incomingIndividuals[idx].fitness);
+            (this->tsp).setFitness(ranks[(numIndividualsIsland - 1) - indivIdx],
+                                   incomingIndividuals[indivIdx].fitness);
         }
         
     } // end numPeriods
     
-    fitness = tsp.getFitness();
-    double bestLocalFitness = max_element(begin(fitness), end(fitness));
+    
+    double bestLocalFitness;
+    bestLocalFitness = (this->tsp).getMaxFitness();
     
     return bestLocalFitness;
 }

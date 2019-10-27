@@ -47,26 +47,20 @@ public:
     /// \return the best length of the best path found by the algorithm
     double solve(int nr_epochs);
     
-    /// Getter method to access the ranks after the execution of the algorithm
+    /// Getter method to access the ranks after the execution of the algorithm (for Island)
     int* getRanks();
     
-    /// Getter method to access the fitness of a single individual
+    /// Getter method to access the fitness of a single individual (for Island)
     double getFitness(int indivIdx);
     
-    /// Getter method to access the "gene" of a single individual
+    /// Setter method to set the fitness of a single individual (for Island)
+    void setFitness(int indivIdx, double fitness);
+    
+    /// Getter method to access the "gene" of a single individual (for Island)
     int* getGene(int indivIdx);
     
-    
-    /// Sets the fitness of a single individual
-    void setFitness(int individualIndex, double fitness);
-    
-    
-    
-    /// Getter method to access the fitnesses after the execution of the algorithm
-    vector<double> getFitness();
-    
-    /// Getter method to access the population after the execution of the algorithm
-    int** getPopulation();
+    /// Returns the maximum value stored inside the vector fitness (for Island)
+    double getMaxFitness();
     
 
 private:
