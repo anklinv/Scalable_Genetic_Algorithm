@@ -66,44 +66,39 @@ double Island::solve() {
         // - this is an attempt to solve this more or less efficiently
         
         // Use (idx, fitness) pairs to facilitate sorting
-        Individual incomingIndividuals[migrationAmount * numProcesses];
+        Individual incomingIndividuals[migrationAmount * (numProcesses - 1)];
+        
+        int helperIdx = 0;
         
         for(int indivIdx = 0; indivIdx < migrationAmount * numProcesses; indivIdx++) {
             
-            (incomingIndividuals[indivIdx]).idx = indivIdx;
-            (incomingIndividuals[indivIdx]).fitness = receiveBufferFitness[indivIdx];
+            if(indivIdx < rank * migrationAmount || (rank + 1) * migrationAmount <= indivIdx) {
+            
+                (incomingIndividuals[helperIdx]).idx = indivIdx;
+                (incomingIndividuals[helperIdx]).fitness = receiveBufferFitness[indivIdx];
+            
+                helperIdx++;
+            }
+            
         }
         
         // Sort the incoming data in ascending order
         // (the data at the current island is already sorted)
-        sort(incomingIndividuals, incomingIndividuals + (migrationAmount * numProcesses));
-        
-        
-        // Use (idx, fitness) pairs
-        Individual worstIslandIndividuals[migrationAmount * numProcesses];
-        int helperIdx = 0;
-        
-        for(int indivIdx = numIndivsIsland - (migrationAmount * numProcesses);
-            indivIdx < numIndivsIsland; indivIdx++) {
-            
-            (worstIslandIndividuals[helperIdx]).idx = ranks[indivIdx];
-            (worstIslandIndividuals[helperIdx]).fitness = (this->tsp)->getFitness(ranks[indivIdx]);
-            
-            helperIdx++;
-        }
-        
+        sort(incomingIndividuals, incomingIndividuals + (migrationAmount * (numProcesses - 1)));
         
         // Determine how many individuals are going to be replaced
         int numReplaced = 0;
         
         int idxIncoming = 0;
+        
+        int offsetIsland = numIndivsIsland - (migrationAmount * (numProcesses - 1));
         int idxIsland = 0;
         
-        while(idxIncoming < migrationAmount * numProcesses
-              && idxIsland < migrationAmount * numProcesses) {
+        while(idxIncoming < migrationAmount * (numProcesses - 1)
+              && idxIsland < migrationAmount * (numProcesses - 1)) {
             
             double currFitnessIncoming = (incomingIndividuals[idxIncoming]).fitness;
-            double currFitnessIsland = (worstIslandIndividuals[idxIsland]).fitness;
+            double currFitnessIsland = (this->tsp)->getFitness(ranks[offsetIsland + idxIsland]);
             
             if(currFitnessIncoming < currFitnessIsland) { // incoming individual is better
                 
@@ -118,7 +113,7 @@ double Island::solve() {
             }
         }
         
-        // Just throw out the numReplaced weakest individuals of the island
+        // Just throw out the numReplaced weakest individuals of the island by replacing their gene
         // - the fitness is updated too
         // - the ranks stored in the TSP object are no longer correct after this step
         for(int indivIdx = 0; indivIdx < numReplaced; indivIdx++) {
@@ -136,7 +131,7 @@ double Island::solve() {
         
     double bestLocalFitness;
     bestLocalFitness = (this->tsp)->getMinFitness();
-        
+    
     return bestLocalFitness;
 }
 

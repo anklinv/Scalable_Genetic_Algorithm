@@ -26,10 +26,6 @@ public:
     /// \param mutation_rate 1/mutation_rate is the probability that an individual gets a mutation
     TravellingSalesmanProblem(int problem_size, int population_count, int elite_size, int mutation_rate);
     
-    /// Copy constructor. Only copies the general settings. The population is initialized randomly.
-    /// \param tsp a TravellingSalesmanProblem
-    TravellingSalesmanProblem(const TravellingSalesmanProblem& tsp);
-    
     ~TravellingSalesmanProblem();
 
     /// Number of nodes in the graph

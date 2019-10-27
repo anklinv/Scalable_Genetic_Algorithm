@@ -4,7 +4,7 @@
 #include "mpi.h" /* requirement for MPI */
 
 #include <algorithm>
-#include <iostream>
+#include <iostream> // for debugging
 
 #include "travelling_salesman_problem.hpp"
 
@@ -66,7 +66,7 @@ public:
      - Fitness evaluation (C_eval) , cross-over and mutation (C_oper) are done by the underlying TSP
      - The Island adds communication (C_comm)  and performs selection and replacement in this context (C_oper)
      
-     \param tsp a fully initialized TSP which is passed to the copy constructor of the aggregated TSP
+     \param tsp a pointer to a fully initialized TSP
      \param migrationPeriod the amount of iterations between two migration steps
      \param migrationAmount the number of individuals each island sends to all others
      \param numPeriods numPeriods * migrationPeriod yields the total number of iterations
