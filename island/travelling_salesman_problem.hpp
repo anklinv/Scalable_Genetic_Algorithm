@@ -82,7 +82,6 @@ private:
     int* ranks;
 
     /// For randomness
-    std::random_device rd;
     std::mt19937 gen;
 
     /// Calculate the fitness of an individual, which is the length of the closed path in the graph and return it.

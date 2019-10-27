@@ -13,7 +13,9 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
     this->fitness = vector<double>(population_count, 0.0);
     this->ranks = new int[population_count];
     this->cities = new int[problem_size * problem_size];
-    this->gen = mt19937(this->rd());
+    
+    random_device rd; // if class variable the copy constructor doesn't work
+    this->gen = mt19937(rd());
 
     // TODO: make this nicer
     this->population = new int *[population_count];
