@@ -4,8 +4,12 @@
 #include "mpi.h" /* requirement for MPI */
 
 #include <algorithm>
+#include <iostream>
 
 #include "travelling_salesman_problem.hpp"
+
+
+using namespace std;
 
 
 /**
@@ -62,34 +66,12 @@ public:
      - Fitness evaluation (C_eval) , cross-over and mutation (C_oper) are done by the underlying TSP
      - The Island adds communication (C_comm)  and performs selection and replacement in this context (C_oper)
      
-     DO NOT USE THIS CONSTRUCTOR - it won't work because .cities and .set_logger ARE NOT SET
-     
-     \param numTSPNodes number of nodes in the graph (TSP)
-     \param populationSize size of the population (TSP)
-     \param eliteSize number of individuals that survive for sure (TSP)
-     \param mutationRate 1/mutationRate is the probability that an individual gets a mutation (TSP)
-     \param migrationPeriod the amount of iterations between two migration steps
-     \param migrationAmount the number of individuals each island sends to all others
-     \param numPeriods numPeriods * migrationPeriod yields the total number of iterations
-    */
-    Island(int numTSPNodes, int populationSize, int eliteSize, int mutationRate,
-           int migrationPeriod, int migrationAmount, int numPeriods):
-    tsp(numTSPNodes, populationSize, eliteSize, mutationRate),
-    migrationPeriod(migrationPeriod),
-    migrationAmount(migrationAmount),
-    numPeriods(numPeriods) {}
-    
-    /**
-     An Island wraps around a TravellingSalesmanProblem
-     - Fitness evaluation (C_eval) , cross-over and mutation (C_oper) are done by the underlying TSP
-     - The Island adds communication (C_comm)  and performs selection and replacement in this context (C_oper)
-     
      \param tsp a fully initialized TSP which is passed to the copy constructor of the aggregated TSP
      \param migrationPeriod the amount of iterations between two migration steps
      \param migrationAmount the number of individuals each island sends to all others
      \param numPeriods numPeriods * migrationPeriod yields the total number of iterations
     */
-    Island(TravellingSalesmanProblem tsp,
+    Island(TravellingSalesmanProblem* tsp,
            int migrationPeriod, int migrationAmount, int numPeriods):
     tsp(tsp),
     migrationPeriod(migrationPeriod),
@@ -107,9 +89,9 @@ public:
 private:
     
     /**
-     The aggregated TravellingSalesmanProblem
+     Use a pointer to avoid dealing with object initialization
      */
-    TravellingSalesmanProblem tsp;
+    TravellingSalesmanProblem* tsp;
     
     /**
      The amount of iterations of the algorithm between two migration steps

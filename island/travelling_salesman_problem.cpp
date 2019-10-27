@@ -13,8 +13,7 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
     this->fitness = vector<double>(population_count, 0.0);
     this->ranks = new int[population_count];
     this->cities = new int[problem_size * problem_size];
-    
-    random_device rd; // if class variable the copy constructor doesn't work
+    random_device rd;
     this->gen = mt19937(rd());
 
     // TODO: make this nicer
@@ -249,8 +248,8 @@ void TravellingSalesmanProblem::setFitness(int indivIdx, double fitness) {
     (this->fitness)[indivIdx] = fitness;
 }
 
-double TravellingSalesmanProblem::getMaxFitness() {
-    return *max_element((this->fitness).begin(), (this->fitness).end());
+double TravellingSalesmanProblem::getMinFitness() {
+    return *min_element((this->fitness).begin(), (this->fitness).end());
 }
 
 int* TravellingSalesmanProblem::getGene(int indivIdx) {

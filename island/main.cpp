@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <iostream> // needed to read files
-#include <string>
+#include <iostream>
+#include <string> // needed to read files
 #include <fstream>
 #include <sstream>
 
@@ -30,8 +30,10 @@ int main(int argc, char** argv) {
     TravellingSalesmanProblem tsp = makeTSP(rank);
     
     // 1000 epochs is def
-    Island island(tsp, 100, 5, 10); // period, amount, numPeriods
+    Island island(&tsp, 200, 5, 5); // period, amount, numPeriods
+    double bestDistance = island.solve();
     
+    cout << bestDistance << endl;
     
     MPI_Finalize(); /* requirement for MPI */
     
@@ -46,7 +48,7 @@ TravellingSalesmanProblem makeTSP(int rank) {
     
     // TODO: Make this nicer, the files are not as consistent as I hoped.
     //       The files can be found at http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsp/index.html
-    ifstream input("data/att48.tsp");
+    ifstream input("../data/att48.tsp");
     string name, comment, type, dimension, edge_weight_type, node;
     
     getline(input, name);
@@ -74,7 +76,7 @@ TravellingSalesmanProblem makeTSP(int rank) {
     input.close();
 
     // Read city coordinates
-    ifstream input2("data/att48.csv");
+    ifstream input2("../data/att48.csv");
     
     for (int i = 0; i < number_cities; ++i) {
         string line;
