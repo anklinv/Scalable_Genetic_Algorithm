@@ -13,6 +13,9 @@ Run the program:
 `mpiexec -np <number of processes> ./Distributed_Genetic_Algorithm`
 
 ## How to run on leonhard
+#### Login to Leonhard
+Note: you need to be in the ETH network! (use VPN)
+```ssh <netz>@login.leonhard.ethz.ch```
 #### Load C++ compiler
 ```module load gcc/8.2.0```
 #### Load MPI
