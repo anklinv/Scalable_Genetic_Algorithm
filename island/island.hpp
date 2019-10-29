@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <iostream> // for debugging
 
-#include "travelling_salesman_problem.hpp"
+#include "../sequential/travelling_salesman_problem.hpp"
 
 
 using namespace std;

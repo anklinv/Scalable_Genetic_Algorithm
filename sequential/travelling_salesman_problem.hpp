@@ -1,6 +1,7 @@
 #ifndef DPHPC_PROJECT_TRAVELLING_SALESMAN_PROBLEM_HPP
 #define DPHPC_PROJECT_TRAVELLING_SALESMAN_PROBLEM_HPP
 
+#include <random>
 #include <vector>
 
 #include "../logging/logging.hpp"
