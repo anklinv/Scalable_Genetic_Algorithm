@@ -16,9 +16,10 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
     this->elite_size = elite_size;
     this->mutation_rate = mutation_rate;
     this->fitness = vector<double>(population_count, 0.0);
-    this->ranks = vector<int>(population_count);
+    this->ranks = new int[population_count];
     this->cities = new int[problem_size * problem_size];
-    this->gen = mt19937(this->rd());
+    random_device rd;
+    this->gen = mt19937(rd());
 
     // TODO: make this nicer
     this->population = new int *[population_count];
@@ -125,8 +126,8 @@ void TravellingSalesmanProblem::rank_individuals() {
         this->fitness_sum += fitness;
         this->fitness_best = min(this->fitness_best, fitness);
     }
-    iota(this->ranks.begin(), this->ranks.end(), 0);
-    sort(this->ranks.begin(), this->ranks.end(), [this] (int i, int j) {
+    iota(this->ranks, this->ranks + population_count, 0);
+    sort(this->ranks, this->ranks + population_count, [this] (int i, int j) {
        return this->fitness[i] < this->fitness[j];
     });
 }
@@ -265,3 +266,24 @@ void TravellingSalesmanProblem::mutate_population() {
 int TravellingSalesmanProblem::rand_range(const int &a, const int&b) {
     return (rand() % (b - a + 1) + a);
 }
+
+int* TravellingSalesmanProblem::getRanks() {
+    return (this->ranks);
+}
+
+double TravellingSalesmanProblem::getFitness(int indivIdx) {
+    return (this->fitness)[indivIdx];
+}
+
+void TravellingSalesmanProblem::setFitness(int indivIdx, double fitness) {
+    (this->fitness)[indivIdx] = fitness;
+}
+
+double TravellingSalesmanProblem::getMinFitness() {
+    return *min_element((this->fitness).begin(), (this->fitness).end());
+}
+
+int* TravellingSalesmanProblem::getGene(int indivIdx) {
+    return (this->population)[indivIdx];
+}
+

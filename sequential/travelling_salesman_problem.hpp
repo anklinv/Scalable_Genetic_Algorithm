@@ -1,6 +1,7 @@
 #ifndef DPHPC_PROJECT_TRAVELLING_SALESMAN_PROBLEM_HPP
 #define DPHPC_PROJECT_TRAVELLING_SALESMAN_PROBLEM_HPP
 
+#include <random>
 #include <vector>
 
 #include "../logging/logging.hpp"
@@ -42,6 +43,21 @@ public:
     /// \param nr_epochs number of steps to evolve
     /// \return the best length of the best path found by the algorithm
     double solve(int nr_epochs, int rank);
+    
+    /// Getter method to access the ranks after the execution of the algorithm (for Island)
+    int* getRanks();
+    
+    /// Getter method to access the fitness of a single individual (for Island)
+    double getFitness(int indivIdx);
+    
+    /// Setter method to set the fitness of a single individual (for Island)
+    void setFitness(int indivIdx, double fitness);
+    
+    /// Getter method to access the "gene" of a single individual (for Island)
+    int* getGene(int indivIdx);
+    
+    /// Returns the maximum value stored inside the vector fitness (for Island)
+    double getMinFitness();
 
 private:
     /// Logger object
@@ -56,10 +72,9 @@ private:
     double fitness_best;
 
     /// Sorted ranks of individuals. i-th element is the index of the i-th best individual
-    vector<int> ranks;
+    int* ranks;
 
     /// For randomness
-    std::random_device rd;
     std::mt19937 gen;
 
     /// Calculate the fitness of an individual, which is the length of the closed path in the graph and return it.
