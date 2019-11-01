@@ -148,8 +148,8 @@ void TravellingSalesmanProblem::breed(int *parent1, int *parent2, int* child) {
     //selecting gene sequences to be carried over to child
     int geneA = this->rand_range(0, this->problem_size - 1);
     int geneB = this->rand_range(0, this->problem_size - 1);
-    int startGene = min(geneA, geneB);
-    int endGene = max(geneA, geneB);
+    int startGene = 0; //min(geneA, geneB);
+    int endGene = int(this->problem_size/2); //max(geneA, geneB);
 
     //performing the carry over from parent 1 to child
     set<int> selected;
@@ -160,10 +160,12 @@ void TravellingSalesmanProblem::breed(int *parent1, int *parent2, int* child) {
 
     //filling rest of child with parent 2
     //this is the culprit (lots of conditional statements)
+    //new approach: iterate over second half of child dna and fill wirh missing 
     int index = 0;
-    for (int i = 0; i < this->problem_size; ++i) {
+    for (int i = int(this->problem_size/2) + 1; i < this->problem_size; ++i) {
         // If not already chosen that city
         if (selected.find(parent2[i]) == selected.end()) {
+            //if we arrived at the gene sequence that has been inserted from parent 1 jump to the end of that sequence
             if (index == startGene) {
                 index = endGene + 1;
             }
