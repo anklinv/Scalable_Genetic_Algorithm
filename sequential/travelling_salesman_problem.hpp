@@ -64,7 +64,7 @@ private:
     Logger *logger;
 
     /// Pointer to the population indices, which has size population_count * problem_size
-    int** population;
+    int* population;
 
     /// Fitness of individuals. i-th element is the path length of i-th individual
     vector<double> fitness;

@@ -9,7 +9,7 @@
 #include <cmath>
 #include <vector>
 #include <sstream>
-
+#include <chrono>
 #include "sequential/travelling_salesman_problem.hpp"
 #include "island/island.hpp"
 
