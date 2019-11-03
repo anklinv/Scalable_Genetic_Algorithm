@@ -83,7 +83,7 @@ private:
     double evaluate_fitness(const int* individual);
 
     /// Run a single iteration of selection, breeding and mutation
-    void evolve(int rank);
+    void evolve(int rank, int epoch);
 
     /// Calculate the fitness of all individuals, save it in this->fitness and also calculate the ranks and save those
     /// in this->ranks

@@ -17,9 +17,11 @@ public:
 
     /// Open logging files
     void open();
+    void open_timing();
 
     /// Close logging files
     void close();
+    void close_timing();
 
     /// Store best fitness value after given number of epochs
     /// \param epoch number of finished epochs (0 means initialised)
@@ -28,10 +30,18 @@ public:
         int epoch,
         std::vector<double> fitness = std::vector<double>()
     );
+    
+    void log_timing_per_epoch(
+        int epoch,
+        double rank,
+        double breed,
+        double mutate
+    );
 
 protected:
     std::string filename_prefix;
     std::ofstream fitness_file;
+    std::ofstream timing_file;
 };
 
 #endif /* DPHPC_PROJECT_LOGGING_HPP */
