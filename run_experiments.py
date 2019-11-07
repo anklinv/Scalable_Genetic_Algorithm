@@ -3,11 +3,16 @@ import subprocess
 import os
 import json
 import argparse
+import itertools
+import datetime
 
-dry_run = True
+default_params = {
+    "mode": "sequential",
+    "-n": 1,
+}
 
 
-def no_job_running():
+def no_job_running(dry_run=False):
     if dry_run:
         return True
     proc = subprocess.Popen(["bjobs"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -15,9 +20,9 @@ def no_job_running():
     return output == "No unfinished job found\n"
 
 
-def submit_job(log_name, filename="Distributed_Genetic_Algorithm", n=1, W="00:30", mem=256):
-    command = "bsub -n {} -W {} -o {}.log -R \"rusage[mem={}]\" mpirun ./{}".format(
-        n, W, log_name, mem, filename
+def submit_job(log_name, filename="Distributed_Genetic_Algorithm", n=1, W="00:30", mem=256, program_params="", dry_run=False):
+    command = "bsub -n {} -W {} -o {}.log -R \"rusage[mem={}]\" mpirun ./{} {}".format(
+        n, W, log_name, mem, filename, program_params
     )
     if dry_run:
         print(command)
@@ -25,28 +30,130 @@ def submit_job(log_name, filename="Distributed_Genetic_Algorithm", n=1, W="00:30
         os.system(command)
 
 
+def param_to_list(param):
+    if param["type"] == "range":
+        start = param["min"]
+        end = param["max"]
+        step = 1 if "stride" not in param else param["stride"]
+        return list(range(start, end, step))
+    elif param["type"] == "list":
+        return param["list"]
+
+
+def find_param(name, var_names, var_vals, fixed_params, default_params):
+    # Try in variable params
+    if name in var_names:
+        i = var_names.index(name)
+        return var_vals[i]
+
+    # Try fixed params
+    if name in fixed_params:
+        return fixed_params[name]
+
+    # Try default params
+    if name in default_params:
+        return default_params[name]
+
+    print("Coult not find parameter {} anywhere!".format(name))
+    exit(1)
+
+
+def create_filename(name):
+    # Replace spaces by underscores
+    file_name = name.replace(" ", "_")
+
+    # Append data and time
+    timestamp = datetime.datetime.now().strftime("%b_%d_%H%M%S")
+
+    return file_name + "_" + timestamp
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Running some experiments")
-    parser.add_argument('-e', type=str, default="experiment.json", dest="experiment",
+    parser.add_argument('--dry_run', default=False, dest="dry_run", action="store_true",
+                        help="Whether to just print the jobs for debugging")
+    parser.add_argument('-e', type=str, default="experiment.json", nargs="+", dest="experiment",
                         help="Which experiment file to run")
     args = parser.parse_args()
-    experiment_file = open(args.experiment)
-    experiments = json.load(experiment_file)
-    experiment_file.close()
-    experiment_name=experiments["name"]
-    print("Running Experiment {} from file {}".format(experiment_name, args.experiment))
 
-    for i, experiment in enumerate(experiments["jobs"]):
-        success = False
-        while not success:
-            if no_job_running():
-                success = True
-                job_name = "_".join([experiment_name, str(i)])
-                n = experiment["n"]
-                submit_job(log_name=job_name, n=n)
-                # Wait to make sure submitted job is visible
-                time.sleep(1)
+    print("Running {} consecutive experiment(s)".format(len(args.experiment)))
+    for e, experiment in enumerate(args.experiment):
+        print("*"*50)
+        try:
+            experiment_file = open(experiment, mode="r")
+        except OSError:
+            print("Failed to open file {}".format(experiment))
+            continue
+
+        experiments = json.load(experiment_file)
+        experiment_file.close()
+        experiment_name = experiments["name"]
+        print("Running Experiment {} from file {}".format(experiment_name, experiment))
+
+        # Create folder
+        experiment_name = create_filename(experiment_name)
+        logging_location = os.path.join("logs", experiment_name)
+        if args.dry_run:
+            print("This will create the folder {}".format(logging_location))
+        else:
+            if os.path.isdir(logging_location):
+                print("Folder {} already exists... exiting".format(logging_location))
+                exit(1)
             else:
-                # Do not retry too much
-                time.sleep(60)
+                print("Logging into folder {}".format(logging_location))
+                os.mkdir(logging_location)
+
+        # Finished setup
+        print("*"*50)
+
+        # Variable parameters
+        grid = list()
+        grid_param = list()
+        for param_name, param in experiments["variable_params"].items():
+            param_list = param_to_list(param)
+            grid.append(param_list)
+            grid_param.append(param_name)
+
+        for job_num, job in enumerate(itertools.product(*grid)):
+            n = find_param("-n", grid_param, job, experiments["fixed_params"], default_params)
+            mode = find_param("mode", grid_param, job, experiments["fixed_params"], default_params)
+
+            program_params = mode + " "
+            # Use all variable params
+            for i, el in enumerate(grid_param):
+                # Skip already handeled parameters
+                if el == "-n" or el == "mode":
+                    continue
+                program_params += el
+                program_params += " "
+                program_params += str(job[i])
+                program_params += " "
+
+            # Use all fixed params
+            for name, param in experiments["fixed_params"].items():
+                if name == "-n" or name == "mode":
+                    continue
+                program_params += name
+                program_params += " "
+                program_params += str(param)
+                program_params += " "
+
+            program_params += "--log_dir"
+            program_params += " "
+            program_params += experiment_name
+
+            success = False
+            while not success:
+                if no_job_running(args.dry_run):
+                    success = True
+                    job_name = "job_" + str(job_num)
+                    log_dir = os.path.join(logging_location, job_name)
+                    submit_job(log_name=log_dir, n=n, program_params=program_params, dry_run=args.dry_run)
+
+                    # Wait to make sure submitted job is visible
+                    if not args.dry_run:
+                        time.sleep(1)
+                else:
+                    # Do not retry too much
+                    time.sleep(60)
 

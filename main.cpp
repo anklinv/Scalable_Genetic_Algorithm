@@ -23,6 +23,8 @@ bool runSequential = true;
 bool runIsland = false;
 string data_dir = "data";
 string data_file = "att48.csv";
+string log_dir = "";
+
 
 // typedefs
 typedef vector<double> vec_d;
@@ -89,6 +91,12 @@ void parse_args(int argc, char** argv, bool verbose=true) {
             }
             if (verbose) {
                 cout << "Number of individuals:\t" << argv[i+1] << endl;
+            }
+        } else if (argv[i] == (string) "--log_dir") {
+            assert(i + 1 < argc);
+            log_dir = argv[i + 1];
+            if (verbose) {
+                cout << "Logging location:\t" << argv[i+1] << endl;
             }
         }
     }
@@ -186,8 +194,10 @@ double computeMean(vec_d data) {
 
 // Data file
 // --data att48.csv
-// Number of individuals (per island)
+// Number of individuals (per island if island model)
 // --population 100
+// Logging direction
+// --log_dir folder_name_in_logs
 //
 // Run sequential:
 // sequential --epochs 1000
@@ -302,6 +312,8 @@ int main(int argc, char** argv) {
         cout << "Done!" << endl;
 
         TravellingSalesmanProblem problem(number_cities, nr_individuals, 10, 16);
+
+        // TODO: Pass log_dir to the logger
         problem.set_logger(new Logger(rank));
         problem.cities = node_edge_mat;
 

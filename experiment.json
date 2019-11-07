@@ -1,11 +1,23 @@
 {
-  "name" : "Test",
-  "jobs" : [
-    {
-      "n" : 1
+  "name" : "try scaling",
+  "fixed_params" : {
+    "mode" : "island"
+  },
+  "variable_params" : {
+    "-n": {
+      "type": "range",
+      "min": 1,
+      "max": 4,
+      "stride": 1
     },
-    {
-      "n" : 2
+    "--population": {
+      "type": "list",
+      "list": [
+        100,
+        200,
+        400,
+        800
+      ]
     }
-  ]
+  }
 }
