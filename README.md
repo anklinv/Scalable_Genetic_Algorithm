@@ -12,7 +12,7 @@ Compile the program:
 Run the program:
 `mpiexec -np <number of processes> ./Distributed_Genetic_Algorithm`
 
-## How to run on leonhard
+## How to setup Leonhard
 #### Login to Leonhard
 Note: you need to be in the ETH network! (use VPN)
 ```ssh <netz>@login.leonhard.ethz.ch```
@@ -25,6 +25,8 @@ Note: you need to be in the ETH network! (use VPN)
 #### Test if it works
 Do not do this exessively as it runs on the login node. Just use for sanity check.
 ```mpirun -np 2 ./Distributed_Genetic_Algorithm```
+
+## Running a single job on Leonhard
 #### Submit job
 Use the following command to submit a job on Leonhard:
 
@@ -45,43 +47,92 @@ Use the following command to submit a job on Leonhard:
 #### Read the logfile
 `vi log_test`
 
- # Setup
+## Running experiments on Leonhard
+#### Experiment specification
+Write a .json file that adheres to the specification below to describe what kind of jobs the cluster
+#### Validate the experiment specification
+To avoid frustration that the jobs did not run correctly, there is an easy way to test what kind of jobs will be scheduled consecutively:
+```
+python run_experiments.py --dry_run -e experiment.json
+```
+where after `-e` follows a list of experiment files to run. The script simply prints all the jobs that will be submitted. If you are happy with the results you can proceed to actually scheduling the jobs
+#### Run the experiment
+As this python script will run for a long time, we recommend that you use `nohup` to avoid any interruptions.
+```
+nohup python run_experiments.py -e experiment.json >> output.log
+```
+This script will also create a folder in `logs` for each experiment and put any outputs in `output.log`.
+When executing the command it outputs the PID of the job. You will need this if you ever need to kill the script.
+#### Kill the experiment script
+If you ever need to kill the experiment script, you can use the command `kill <PID>` where PID is the PID that was outputted when running the experiment. In case you don't know it, use `htop` and search for `python` to find a process that runs under your own username and use that PID.
 
- ### Justin's setup:
- #### MacBook Pro:
-* Processor Name:    Intel Core i7
-* Processor Speed:    2.3 GHz
-* Number of Processors:    1
-* Total Number of Cores:    4
-* L2 Cache (per Core):    256 KB
-* L3 Cache:    6 MB
-* Hyper-Threading Technology:    Enabled
-* Memory:    8 GB (2 banks, 1600MHz)
-#### Compiler:
-* gcc version: 4.2.1 (possibly too outdated)
-* Apple clang version 11.0.0 (clang-1100.0.33.8)
-* Target: x86_64-apple-darwin18.7.0
-* Thread model: posix
+## JSON specification for experiments
+When writing an experiment specification you need to follow this standard:
+```
+{
+  "name" : <EXPERIMENT_NAME>,
+  "fixed_params" : {
+    <FIXED_PARAM_1_NAME> : <FIXED_PARAM_1_VALUE>,
+    ...
+    <FIXED_PARAM_N_NAME> : <FIXED_PARAM_N_VALUE>
+  },
+  "variable_params" : {
+    <VAR_PARAM_1_NAME> : <VAR_PARAM_1_VALUE>,
+    ...
+    <VAR_PARAM_M_NAME> : <VAR_PARAM_M_VALUE>
+  }
+}
+```
+- <EXPERIMENT_NAME> is any identifier for the experiment. White spaces will be turned into underscores for the folder name
+- <FIXED_PARAM_i_NAME> is the string of the argument identifier that should be fixed in the experiment.
+- <FIXED_PARAM_i_VALUE> is the integer or string of the value.
+- <VAR_PARAM_j_NAME> is the string of the argument identifier that should be varied in the experiment.
+- <VAR_PARAM_j_VALUE> is a dict of the elements that should be varied.
+  - It can be a range from <MIN> to <MAX> with stride <STRIDE> (if stride is not specified the value 1 is assumed):
+    ```
+    {
+      "type" : "range",
+      "min" : <MIN>,
+      "max" : <MAX>,
+      "stride" : <STRIDE>
+    }
+    ```
+   - It can be a list of values <VAL_1>, ..., <VAL_K>:
+     ```
+     {
+       "type" : "list",
+       "list" : [
+         <VAL_1>,
+         ...
+         <VAL_K>
+       ]
+     }
+     ```
 
- # Progress
-
- ## Miscelaneous
-
- * write python preprocessing scripts: create node edge incidence matrix: done
- * python postprocessing: visualization of results via plots etc.
-
- ## 1st experiment: sequential implementation of GA
-
- * Working implementation by Valentin in C++
- * Done, needs to be benchmarked
- * Maybe some optimization and cleaning can be done
- * reads inputs from csv file as opposed to raw txt file
- * Implementation in C started by Justin: so far can only read node incidence matrix from a .csv file
-
- ## 2nd experiment: naive parallel implementation with MPI
-
- ## 3rd experiment: island based implementation
-
- ## 4th experiment: asynchronous migration
-
- ## 5th experiment: RDMA migration
+## Example JSON for experiment
+In this example we try different number of islands of different sizes. We try every combination of using an island of size k where `1 <= k < 4` and the population size p where `p ∈ {100, 200, 400, 800}`.
+```
+{
+  "name" : "try scaling and population size",
+  "fixed_params" : {
+    "mode" : "island"
+  },
+  "variable_params" : {
+    "-n": {
+      "type": "range",
+      "min": 1,
+      "max": 4,
+      "stride": 1
+    },
+    "--population": {
+      "type": "list",
+      "list": [
+        100,
+        200,
+        400,
+        800
+      ]
+    }
+  }
+}
+```
