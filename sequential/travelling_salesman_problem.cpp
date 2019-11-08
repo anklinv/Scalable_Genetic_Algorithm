@@ -180,7 +180,7 @@ void TravellingSalesmanProblem::breed_population() {
         correct_fitness.push_back(1 / pow(f / this->fitness_sum, 4));
     }
 
-    auto dist = std::discrete_distribution(correct_fitness.begin(), correct_fitness.end());
+    auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());
 
     // Breed any random individuals
     for (int i = this->elite_size; i < this->population_count; ++i) {

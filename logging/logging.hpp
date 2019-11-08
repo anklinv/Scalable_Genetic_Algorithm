@@ -1,6 +1,8 @@
 #ifndef DPHPC_PROJECT_LOGGING_HPP
 #define DPHPC_PROJECT_LOGGING_HPP
 
+#include <chrono>
+#include <ctime>
 #include <cstdint>
 #include <fstream>
 #include <vector>
