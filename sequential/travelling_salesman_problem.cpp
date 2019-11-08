@@ -107,7 +107,7 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
 }
 
 void TravellingSalesmanProblem::rank_individuals() {
-    this->logger->log_wall_clock(LOGGING_TAG_WC_RANK_INDIVIDUALS_BEGIN);
+    this->logger->LOG_WC(RANK_INDIVIDUALS_BEGIN);
     this->fitness_sum = 0.0;
     this->fitness_best = std::numeric_limits<typeof(this->fitness_best)>::max();
     int* pop = new int[this->problem_size];
@@ -122,7 +122,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     sort(this->ranks, this->ranks + this->population_count, [this] (int i, int j) {
        return this->fitness[i] < this->fitness[j];
     });
-    this->logger->log_wall_clock(LOGGING_TAG_WC_RANK_INDIVIDUALS_END);
+    this->logger->LOG_WC(RANK_INDIVIDUALS_END);
 }
 
 double TravellingSalesmanProblem::evaluate_fitness(const int *individual) {

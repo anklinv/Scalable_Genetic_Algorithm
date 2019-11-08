@@ -12,6 +12,9 @@
 typedef uint32_t tag_t;
 typedef uint32_t tag_value_t;
 
+#define LOG_WC(EVENT) log_wall_clock(LOGGING_TAG_WC_##EVENT)
+#define LOG_CC(EVENT) log_cpu_time(LOGGING_TAG_CC_##EVENT)
+
 class Logger {
 public:
     /// Generate a Logger object to collect statistics and debug data

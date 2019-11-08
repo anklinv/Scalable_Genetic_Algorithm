@@ -28,14 +28,14 @@ void Logger::open() {
 
     this->clock = std::chrono::high_resolution_clock();
     this->start = this->clock.now();
-    log_wall_clock(LOGGING_TAG_WC_LOGGING_BEGIN);
-    log_cpu_time(LOGGING_TAG_CC_LOGGING_BEGIN);
+    LOG_WC(LOGGING_BEGIN);
+    LOG_CC(LOGGING_BEGIN);
 }
 
 void Logger::close() {
     this->fitness_file.close();
-    log_wall_clock(LOGGING_TAG_WC_LOGGING_END);
-    log_cpu_time(LOGGING_TAG_CC_LOGGING_END);
+    LOG_WC(LOGGING_END);
+    LOG_CC(LOGGING_END);
     this->tag_file.close();
 }
 
