@@ -19,7 +19,7 @@ public:
     /// Generate a Logger object to collect statistics and debug data
     /// \param rank rank of the current process
     /// \param time used in specifying file names
-    Logger(int rank, time_t *time = nullptr);
+    Logger(std::string dir, int rank, time_t *time = nullptr);
 
     /// Open logging files
     void open();

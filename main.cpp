@@ -23,7 +23,7 @@ bool runSequential = true;
 bool runIsland = false;
 string data_dir = "data";
 string data_file = "att48.csv";
-string log_dir = "";
+string log_dir = "logs/";
 
 
 // typedefs
@@ -158,7 +158,7 @@ double setupAndRunGA(int rank) {
     cout << "Done!" << endl;
 
     TravellingSalesmanProblem problem(number_cities, nr_individuals, 10, 16);
-    problem.set_logger(new Logger(rank));
+    problem.set_logger(new Logger(log_dir, rank));
     problem.cities = node_edge_mat;
     
     // Solve problem
@@ -314,7 +314,7 @@ int main(int argc, char** argv) {
         TravellingSalesmanProblem problem(number_cities, nr_individuals, 10, 16);
 
         // TODO: Pass log_dir to the logger
-        problem.set_logger(new Logger(rank));
+        problem.set_logger(new Logger(log_dir, rank));
         problem.cities = node_edge_mat;
 
         // 1000 epochs is def
