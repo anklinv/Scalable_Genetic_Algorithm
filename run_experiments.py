@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
         # Create folder
         experiment_name = create_filename(experiment_name)
-        logging_location = os.path.join("logs", experiment_name)
+        logging_location = os.path.join("logs", experiment_name, "")
         if args.dry_run:
             print("This will create the folder {}".format(logging_location))
         else:
@@ -140,7 +140,7 @@ if __name__ == "__main__":
 
             program_params += "--log_dir"
             program_params += " "
-            program_params += experiment_name
+            program_params += logging_location
 
             success = False
             while not success:

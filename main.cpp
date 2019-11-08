@@ -24,6 +24,9 @@ bool runIsland = false;
 string data_dir = "data";
 string data_file = "att48.csv";
 string log_dir = "";
+int migration_period = 200;
+int migration_amount = 5;
+int num_migrations = 5;
 
 
 // typedefs
@@ -97,6 +100,39 @@ void parse_args(int argc, char** argv, bool verbose=true) {
             log_dir = argv[i + 1];
             if (verbose) {
                 cout << "Logging location:\t" << argv[i+1] << endl;
+            }
+        } else if (argv[i] == (string) "--migration_period") {
+            assert(i + 1 < argc);
+            try {
+                migration_period = stoi(argv[i+1]);
+            } catch (const std::invalid_argument &e) {
+                cerr << "Invalid integer for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose) {
+                cout << "Migration Period:\t" << argv[i+1] << endl;
+            }
+        } else if (argv[i] == (string) "--migration_amount") {
+            assert(i + 1 < argc);
+            try {
+                migration_amount = stoi(argv[i+1]);
+            } catch (const std::invalid_argument &e) {
+                cerr << "Invalid integer for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose) {
+                cout << "Migration Amount:\t" << argv[i+1] << endl;
+            }
+        } else if (argv[i] == (string) "--num_migrations") {
+            assert(i + 1 < argc);
+            try {
+                num_migrations = stoi(argv[i+1]);
+            } catch (const std::invalid_argument &e) {
+                cerr << "Invalid integer for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose) {
+                cout << "Number of Migrations:\t" << argv[i+1] << endl;
             }
         }
     }
@@ -318,7 +354,7 @@ int main(int argc, char** argv) {
         problem.cities = node_edge_mat;
 
         // 1000 epochs is def
-        Island island(&problem, 200, 5, 5); // period, amount, numPeriods
+        Island island(&problem, migration_period, migration_amount, num_migrations); // period, amount, numPeriods
         double bestDistance = island.solve();
 
         if(rank == 0) {
