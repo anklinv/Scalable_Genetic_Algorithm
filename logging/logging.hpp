@@ -5,6 +5,8 @@
 #include <fstream>
 #include <vector>
 
+#include "tags.hpp"
+
 typedef uint32_t tag_t;
 typedef uint32_t tag_value_t;
 

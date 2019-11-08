@@ -1,5 +1,6 @@
 import argparse
 import glob
+import numpy as np
 import os
 import re
 import struct
@@ -101,7 +102,7 @@ class Log(object):
         diffs = [(ends[i] - begins[i]) % (1 << 32) for i in range(len(begins))]
         assert all([d < (1 << 31) for d in diffs])
 
-        durations = [float(d) / 1e6 for d in diffs]
+        durations = [float(d) / 1e6 * 1e3 for d in diffs]
         return durations
         
     def get_cpu_clock_durations(self, name):
@@ -120,7 +121,7 @@ class Log(object):
         diffs = [(ends[i] - begins[i]) % (1 << 32) for i in range(len(begins))]
         assert all([d < (1 << 31) for d in diffs])
 
-        durations = [float(d) / self.clocks_per_sec for d in diffs]
+        durations = [float(d) / self.clocks_per_sec * 1e3 for d in diffs]
         return durations
         
 def last_log():
@@ -155,9 +156,13 @@ if __name__ == "__main__":
     logs = [Log(log_fn, tags) for log_fn in log_fns]
     
     for log in logs:
-        print(
-            'wall clock:',
-            log.get_wall_clock_durations('logging')[0],
-            'CPU clock:',
-            log.get_cpu_clock_durations('logging')[0]
+        print('total:',
+            f"wall clock {log.get_wall_clock_durations('logging')[0]:.3f}ms",
+            f"CPU clock {log.get_cpu_clock_durations('logging')[0]:.3f}ms"
+        )
+        ri_arr = log.get_wall_clock_durations('rank_individuals')
+        print('rank_individuals:',
+            f"length {len(ri_arr)},",
+            f"mean {np.mean(ri_arr):.3f}ms,",
+            f"std {np.std(ri_arr):.3f}ms"
         )
