@@ -3,6 +3,8 @@
 cmake-build-debug
 venv
 __pycache__
+.vs
+build
 
 # Prerequisites
 *.d
