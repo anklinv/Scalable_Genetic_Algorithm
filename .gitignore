@@ -2,6 +2,8 @@
 .vscode
 cmake-build-debug
 venv
+.vs
+build
 
 # Prerequisites
 *.d
