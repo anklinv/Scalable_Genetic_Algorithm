@@ -5,15 +5,13 @@
 #include "logging.hpp"
 #include "tags.hpp"
 
-#define LOGGING_DIRECTORY "logs/"
-
 Logger::Logger(std::string filename_prefix) {
     this->filename_prefix = filename_prefix;
 }
 
-Logger::Logger(int rank, time_t *time) {
+Logger::Logger(std::string dir, int rank, time_t *time) {
     std::stringstream ss;
-    ss << LOGGING_DIRECTORY;
+    ss << dir;
     auto t = std::time(time);
     auto tm = *std::localtime(&t);
     ss << std::put_time(&tm, "%Y-%m-%d_%H-%M-%S") << "_";

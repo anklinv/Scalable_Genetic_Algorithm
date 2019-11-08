@@ -23,7 +23,7 @@ bool runSequential = true;
 bool runIsland = false;
 string data_dir = "data";
 string data_file = "att48.csv";
-string log_dir = "";
+string log_dir = "logs/";
 int migration_period = 200;
 int migration_amount = 5;
 int num_migrations = 5;
@@ -139,29 +139,29 @@ void parse_args(int argc, char** argv, bool verbose=true) {
 }
 
 double setupAndRunGA(int rank) {
-    
+
     // TODO: Make this nicer, the files are not as consistent as I hoped.
     //       The files can be found at http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsp/index.html
     ifstream input("data/att48.tsp");
     string name, comment, type, dimension, edge_weight_type, node;
-    
+
     getline(input, name);
     name = name.substr(7, name.length());
-    
+
     getline(input, comment);
     comment = comment.substr(10, comment.length());
-    
+
     getline(input, type);
     type = type.substr(7, type.length());
-    
+
     getline(input, dimension);
     dimension = dimension.substr(12, dimension.length());
-    
+
     getline(input, edge_weight_type);
     edge_weight_type = edge_weight_type.substr(18, edge_weight_type.length());
-    
+
     getline(input, node);
-    
+
     // Read cities
     int number_cities = stoi(dimension);
     int node_edge_mat[number_cities * number_cities];
@@ -171,7 +171,7 @@ double setupAndRunGA(int rank) {
 
     // Read city coordinates
     ifstream input2("data/att48.csv");
-    
+
     for (int i = 0; i < number_cities; ++i) {
         string line;
         getline(input2, line);
@@ -179,7 +179,7 @@ double setupAndRunGA(int rank) {
             break;
         }
         stringstream iss(line);
-        
+
         for (int j = 0; j < number_cities; ++j) {
             string val;
             getline(iss, val, ';');
@@ -194,36 +194,36 @@ double setupAndRunGA(int rank) {
     cout << "Done!" << endl;
 
     TravellingSalesmanProblem problem(number_cities, nr_individuals, 10, 16);
-    problem.set_logger(new Logger(rank));
+    problem.set_logger(new Logger(log_dir, rank));
     problem.cities = node_edge_mat;
-    
+
     // Solve problem
     double final_distance;
     final_distance = problem.solve(nr_epochs, rank);
     cout << "Final distance is " << final_distance << " (rank " << rank << ")" << endl;
-    
+
     // TODO: Graph, maybe visualization
-    
+
     return final_distance;
 }
 
 double computeStdDev(vec_d data) {
-    
+
     double mean = accumulate(data.begin(), data.end(), 0.0) / data.size();
-    
+
     double sum_squares = 0.0;
-    
+
     for(auto it = data.begin(); it != data.end(); it++) {
         sum_squares += (*it - mean) * (*it - mean);
     }
-    
+
     sum_squares = sum_squares / data.size();
-    
+
     return sqrt(sum_squares);
 }
 
 double computeMean(vec_d data) {
-    
+
     double sum = accumulate(data.begin(), data.end(), 0.0);
     return sum / data.size();
 }
@@ -350,7 +350,7 @@ int main(int argc, char** argv) {
         TravellingSalesmanProblem problem(number_cities, nr_individuals, 10, 16);
 
         // TODO: Pass log_dir to the logger
-        problem.set_logger(new Logger(rank));
+        problem.set_logger(new Logger(log_dir, rank));
         problem.cities = node_edge_mat;
 
         // 1000 epochs is def
