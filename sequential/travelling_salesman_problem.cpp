@@ -9,6 +9,15 @@
 #include <cassert>
 #include "travelling_salesman_problem.hpp"
 
+#define SAFE_DEBUG
+#ifdef SAFE_DEBUG
+#define VAL_POP(i,j) assert(i >= 0); assert(i < this->population_count); assert(j >= 0); assert(j < this->problem_size)
+#define VAL_DIST(i,j) assert(i >= 0); assert(i < this->problem_size); assert(j >= 0); assert(j < this->problem_size)
+#else
+#define VAL_POP(i,j)
+#define VAL_DIST(i,j)
+#endif
+
 #define POP(i,j) this->population[i * this->problem_size + j]
 #define DIST(i,j) this->cities[i * this->problem_size + j]
 
@@ -48,6 +57,7 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, flo
     for (int i = 0; i < population_count; ++i) {
         shuffle(tmp_indices.begin(), tmp_indices.end(), this->gen);
         for (int j = 0; j < problem_size; ++j) {
+            VAL_POP(i, j);
             POP(i,j) = tmp_indices[j]; //this works
         }
     }
@@ -171,8 +181,14 @@ void TravellingSalesmanProblem::rank_individuals() {
 double TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     double route_distance = 0.0;
     for (int j = 0; j < this->problem_size - 1; ++j) {
+        VAL_POP(individual, j);
+        VAL_POP(individual, j+1);
+        VAL_DIST(POP(individual, j), POP(individual, j + 1));
         route_distance += DIST(POP(individual, j), POP(individual, j + 1));
     }
+    VAL_POP(individual, this->problem_size - 1);
+    VAL_POP(individual, 0);
+    VAL_DIST(POP(individual, this->problem_size - 1), POP(individual, 0));
     route_distance += DIST(POP(individual, this->problem_size - 1), POP(individual, 0)); //complete the round trip
     return route_distance;
 }
@@ -242,6 +258,7 @@ void TravellingSalesmanProblem::breed_population() {
 
     for (int i = 0; i < this->population_count; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
+            VAL_POP(i, j);
             POP(i, j) = temp_population[i][j];
         }
     }
@@ -252,6 +269,8 @@ void TravellingSalesmanProblem::mutate(int individual) {
         int swap = rand_range(0, this->problem_size - 1);
         int swap_with = rand_range(0, this->problem_size - 1);
 
+        VAL_POP(individual, swap);
+        VAL_POP(individual, swap_with);
         int city1 = POP(individual, swap);
         int city2 = POP(individual, swap_with);
         POP(individual, swap) = city2;
@@ -301,6 +320,7 @@ double TravellingSalesmanProblem::getMinFitness() {
 int* TravellingSalesmanProblem::getGene(int indivIdx) {
     int* pop = new int[this->problem_size];
     for (int j = 0; j < this->problem_size; ++j){
+        VAL_POP(indivIdx, j);
 	    pop[j] = POP(indivIdx, j);
     } 
     return pop;
