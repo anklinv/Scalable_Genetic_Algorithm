@@ -18,13 +18,13 @@
 #include <set>
 #include <chrono>
 
-#include "cudnn.h"
 #include "util.h"
 #include "official.h"
 
 #define PROBLEM_SIZE 48
-#define POPULATION_SIZE (PROBLEM_SIZE * 20)
+#define POPULATION_SIZE (PROBLEM_SIZE * PROBLEM_SIZE) * 1 //must be multiple of PROBLEM_SIZE ^ 2
 #define EPOCHS 100
+#define ISLANDS 4
 
 using namespace std;
 
@@ -36,37 +36,46 @@ using namespace std;
 	}																					\
 }
 
-void evaluate_fitness(const int *population, double *fitness, double *nei, int xthr, int ythr) {
+/* Function to evaluate fitness using a population matrix, the node edge incidence matrix and the thread numbers to get the correct members */
+void evaluate_fitness(const int *population, float *fitness, float *nei, int xthr, int ythr, float *fitness_sum, float *fitness_max) {
+    fitness_sum[0] = 0.0;
     for(int i = 0; i < POPULATION_SIZE/(PROBLEM_SIZE * PROBLEM_SIZE), i++){
-        double route_distance = 0.0;
+        float route_distance = 0.0;
         for(int j = 0; j < PROBLEM_SIZE - 1; j++){
-            route_distance += nei[population[j + xthr * ythr * PROBLEM_SIZE * i] + PROBLE_SIZE * individual[j + 1 + xthr * ythr * PROBLEM_SIZE * i]];   //matrix lookup for a distance between two cities
+            route_distance += nei[population[j + xthr * (ythr + PROBLEM_SIZE) * PROBLEM_SIZE * i] + PROBLE_SIZE * individual[j + 1 + xthr * (ythr + PROBLEM_SIZE) * PROBLEM_SIZE * i]];   //matrix lookup for a distance between two cities
         }
-        route_distance += nei[population[PROBLEM_SIZE - 1 + xthr * ythr * PROBLEM_SIZE * i] + PROBLE_SIZE * individual[0 + xthr * ythr * PROBLEM_SIZE * i]];
+        route_distance += nei[population[PROBLEM_SIZE - 1 + xthr * (ythr + PROBLEM_SIZE) * PROBLEM_SIZE * i] + PROBLE_SIZE * individual[0 + xthr * (ythr + PROBLEM_SIZE) * PROBLEM_SIZE * i]];
+	fitness[xthr * (ythr + PROBLEM_SIZE) * i] = 1/route_distance;
+	__syncthreads();
+	if (fitness[xthr * (ythr + PROBLEM_SIZE) * i] > fitness_max[0]){
+		fitness_max[0] = fitness[xthr * (ythr + PROBLEM_SIZE) * i];
+	}
+	fitness_sum[0] += route_distance;
+    }
 }
 
-/*
-    NOT DONE YET
-*/
-void crossover(int *population, double *fitness, int xthr, int ythr){
-    int temp_population[PROBLEM_SIZE * 2];
-    int exclusion_list
+/* Function that performs crossover based on roulette wheel selection  */
+void crossover(int *population, float *fitness, int xthr, int ythr, float *fitness_sum, int *new_population){
+   int* temp_population = new int[PROBLEM_SIZE * POPULATION_SIZE];
+   auto dist = discrete_distribution<int>(fitness);
+   int parent1, parent2;
+   volatile int vol_index = 0;
+   int index;
+   random_device rd;
+   gen = mt19937(rd());
 
-   // Keep the best individuals
-   for (int i = 0; i < this->elite_size; ++i) {
-       for (int j = 0; j < this->problem_size; ++j) {
-           temp_population[i][j] = this->population[this->ranks[i] + this->population_count * j]; //this works
-       }
-   }
-
-   vector<double> correct_fitness;
-   correct_fitness.reserve(this->population_count);
-   for (auto f : this->fitness) {
-       correct_fitness.push_back(1 / pow(f / this->fitness_sum, 4));
-   }
-
-   auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());
-
+   for(int i = 0; i < POPULATION_SIZE/(PROBLEM_SIZE * PROBLEM_SIZE), i++){
+	parent1 = dist(gen);
+	parent2 = dist(gen);
+	while(parent2 == parent1){
+		parent2 = dist(gen);
+	}
+	index = vol_index;
+	vol_index = vol_index + 2;;
+	for 
+	
+	
+	
    // Breed any random individuals
    for (int i = this->elite_size; i < this->population_count; ++i) {
    int rand1 = dist(gen);
@@ -121,15 +130,19 @@ void crossover(int *population, double *fitness, int xthr, int ythr){
 }
 
 __global__ void kernel_tsp_ga(float *pInputs, float *pOutputs) {
-	int Inx = blockIdx.x; //island
+    int Inx = blockIdx.x; //island
     int Iny = blockIdx.y; //island
     int Inz = blockIdx.z; //island
-	int x_thread = threadIdx.y; //gene (column) of population
-	int y_thread = threadIdx.x; //member (row) of group
+    int x_thread = threadIdx.y; //gene (column) of population
+    int y_thread = threadIdx.x; //member (row) of group
     int z_thread = threadIdx.z; //group of consecutive members (rows) of population
-	extern __shared__ float input[];
+    extern __shared__ float input[];
     extern __shared__ int population[];
+    extern __shared__ int new_population[];
     extern __shared__ float fitness[];
+    extern __shared__ volatile float fitness_sum = 0;
+    extern __shared__ volatile float fitness_max = 0;
+    extern __shared__ float best_individual_per_generation[];
  
     random_device rd;
     gen = mt19937(rd());
@@ -141,7 +154,7 @@ __global__ void kernel_tsp_ga(float *pInputs, float *pOutputs) {
     vector<int> tmp_indices(problem_size);
     tmp_indices[x_thread] = x_thread;
     __syncthreads();
-    for(int i = 0; i < POPULATION_SIZE/(PROBLEM_SIZE * PROBLEM_SIZE), i++){
+    for(int i = 0; i < POPULATION_SIZE/(PROBLEM_SIZE * PROBLEM_SIZE); i++){
         shuffle(tmp_indices.begin(), tmp_indices.end(), gen);
         for (int z = 0; z < PROBLEM_SIZE; z++){
             population[z + x_thread * y_thread * PROBLEM_SIZE * i] = tmp_indices[x_thread];
@@ -152,8 +165,12 @@ __global__ void kernel_tsp_ga(float *pInputs, float *pOutputs) {
     //start GA
     for (i = 0; i < EPOCHS){
         //fitness evaluation
-        evaluate_fitness(population, fitness, input, x_thread, y_thread);
+	fitness_sum = 0;
+	fitness_min = 0;
+	__syncthreads();
+        evaluate_fitness(population, fitness, input, x_thread, y_thread, &fitness_sum, &fitness_max);
         __syncthreads();
+	best_fitness_per_generation[i] = fitness_max;
         
         //crossover
         
@@ -163,6 +180,7 @@ __global__ void kernel_tsp_ga(float *pInputs, float *pOutputs) {
 int traveling_salesman_problem() {
 
 	float *input_ = get_parameter(inputName, PROBLEM_SIZE * PROBLEM_SIZE);
+	float *output_;
     
 	float *input, *population;
 	uint64_t nT1 = 0, nT2 = 0;
@@ -176,9 +194,6 @@ int traveling_salesman_problem() {
 
 
 	/*  1. Data preparation  */
-	float *t_input, *ip;
-	
-	float *dummyBTdB, *dummyOP, *dummyATIA, *dummyIN;
 
 	int nInput = PROBLEM_SIZE * PROBLEM_SIZE;
 	int nPopulation = PROBLEM_SIZE * POPULATION_SIZE;
@@ -187,7 +202,7 @@ int traveling_salesman_problem() {
 	cudaMalloc((void **) &population, nPopulation*sizeof(float));
 	cudaMemset((void *) input, 0, nInput * sizeof(float));
 	cudaMemset((void *) output, 0, nOutput*sizeof(float));
-	cudaMemcpy(input, input_, nInput*sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(input, input_, nInput*sizeof(float), cudaMemcpyHostToDevice); //from input_ to input
 	
 	float output[nPopulation];
 
@@ -198,7 +213,7 @@ int traveling_salesman_problem() {
 	//cudaProfilerStart();
 
 	//###B'dB the first matrix multiplication for data transform###
-	kernel_tsp <<<dim3(BLOCK_NUM,BLOCK_NUM, (CHANNEL_NUMBER/128)), dim3(128, WINO_KERNEL_SIZE),(WINO_KERNEL_SIZE*WINO_KERNEL_SIZE*128)*sizeof(float) >>> (input, t_input);
+	kernel_tsp <<<ISLANDS, dim3(PROBLEM_SIZE, PROBLEM_SIZE)>>> (input, output);
 	cudaDeviceSynchronize();
 
 	cudaError_t errorBTDB = cudaGetLastError();
@@ -215,14 +230,11 @@ int traveling_salesman_problem() {
 
 
 	/*  3. Copy back and free  */
-	s = cudaMemcpy(tmp_winograd, output, nOutput*sizeof(float), cudaMemcpyDeviceToHost);
+	s = cudaMemcpy(output_, output, nOutput*sizeof(float), cudaMemcpyDeviceToHost);
 	printf("%s\n", cudaGetErrorName(s));
 	//cudaCheckError();
 
-	cudaFree(t_input);
 	cudaFree(output);
 
-	output_checker(tmp_winograd, tmp_cudnn, FEAT_SIZE, CHANNEL_NUMBER, 1);
-
-	return ((nT2-nT1) << 16) | (nT2_cudnn-nT1_cudnn);
+	return ((nT2-nT1) << 16);
 }
