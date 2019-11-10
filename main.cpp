@@ -158,7 +158,7 @@ double computeMean(vec_d data) {
     return sum / data.size();
 }
 
-void read_input(int &num_cities, int*& cities_matrix) {
+void read_input(int &num_cities, float*& cities_matrix) {
     // READ INPUT
     ifstream input(data_dir + "/" + data_file);
     // Read number of cities
@@ -166,7 +166,7 @@ void read_input(int &num_cities, int*& cities_matrix) {
     getline(input, dim);
     num_cities = stoi(dim);
     cout << "number of cities: " << num_cities << endl;
-    cities_matrix = new int[num_cities * num_cities];
+    cities_matrix = new float[num_cities * num_cities];
     // Read values
     for (int i = 0; i < num_cities; ++i) {
         string line;
@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
 
     // Read input
     int number_cities = -1;
-    int* node_edge_mat;
+    float* node_edge_mat;
     read_input(number_cities, node_edge_mat);
     assert(number_cities != -1);
 
