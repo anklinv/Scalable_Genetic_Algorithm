@@ -12,13 +12,44 @@
 
 using namespace std;
 
-// set up send buffer
-// set up receive buffer
+// COMPLEMENTARY to TOPOLOGY (src rec relation - network)
+// min. 1 ADDITIONAL PARAMETER - throughput: number of individuals to send? OR number of individuals to receive?
+// I think #receive is the more sensible parameter
+// - corresponds to the alteration of the current population
+// - similar to elitism
+// topology then fixes where these #receive new individuals come from
+// - "multiple source (at rec) multiple destination (at src)" data transfer for e.g. fully connected
+// interesting experiments if number of islands n is scaled up drastically
+// (alternatives: fix both, fix send -> cumbersome as calculations necessary)
+// (circumventions for "special cases" necessary in all cases i guess e.g. truncation for quantity conversion)
+// functional dependency q_rec = f(q_sel, t) where t is TOPOLOGY
+// maybe add this to NETWORK struct
+
+// function to compute size of send buffer
+// dependency f(TOPOLOGY, NUM_RECEIVE)
+// -> size independent of selection policy (any policy can be used to select q individuals)
+// -> outgoing delivery packet, same for all edges
+// size = min(1, f(q_sel, t)) -> otherwise the TOPOLOGY PARAMETER would not make much sense
+
+// function to compute size of receive buffer
+// dependency f(NUM_RECEIVE)
+
+// functions to fill send buffer
+// dependency f(SELECTION_POLICY)
+
 // ---- SYNCHRONOUS exchange of data (needs send buffer & receive buffer) ----
-// integrate data
+// Allgather for synchronous case
+// send buffer, receive buffer are already set up
+// do cleanup here (i.e. somehow remove redundant data e.g. with pointers or find some other MPI function)
+
+// function to integrate data
+// dependency f(REPLACEMENT_POLICY)
+
 
 // ASYNCHRONOUS
-// ?
+// while loop with periodic checking
+// nonblocking send and receive with periodic checking
+// cf lecture
 
 class Island {
     
@@ -55,7 +86,7 @@ public:
     enum MigrationTopology {
         FULLY_CONNECTED,
         ISOLATED,
-        RING
+        RING // 1D directed grid
     };
 
     enum SelectionPolicy {
@@ -89,11 +120,21 @@ private:
     
     
     /// Use a pointer to avoid dealing with object initialization
+    // TODO: change to object variable
     const TravellingSalesmanProblem* TSP;
  
     
     /// Migration topology (connections between islands)
     const MigrationTopology MIGRATION_TOPOLOGY;
+    
+    /// Number of immigrants each island receives during each migration step. This is necessary to
+    /// fully specify the migration topology.
+    const int NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION;
+    
+    /// Number of active islands. Has to be equal to the number of ranks in MPI_COMM_WORLD.  It is
+    /// necessary that all ranks in MPI_COMM_WORLD execute the GA simultaneously.
+    const int NUM_ACTIVE_ISLANDS;
+    
 
     /// Selection policy (source island)
     const SelectionPolicy SELECTION_POLICY;
@@ -102,21 +143,21 @@ private:
     const ReplacementPolicy REPLACEMENT_POLICY;
     
     
-    /**
-     The amount of iterations of the algorithm between two migration steps
-     */
+    /// The number of evolution steps between two migration steps
     const int MIGRATION_PERIOD;
     
-    /**
-     The amount of individuals each island sends to all other islands
-     */
-    const int MIGRATION_AMOUNT;
+    /// The total number of evolution steps after which the genetic algorithm terminates.
+    const int NUM_EVOLUTIONS;
     
-    /**
-     The number of migration periods. The overall number of iterations is given by numPeriods * migrationPeriod.
-     */
-    const int NUM_PERIODS;
     
+    /// Computes the size of the send buffer. The size of the send buffer depends on MIGRATION_TOPOLOGY and
+    /// NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION. Called once in the constructor.
+    int computeSendBufferSize();
+    
+    /// Computes the size of the receive buffer. The size of the receive buffer differs from NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION
+    /// because of the internal use of MPI_Allgather and the case where the immigrants cannot be evenly distributed among
+    /// senders. Called once in the constructor.
+    int computeReceiveBufferSize(int sendBufferSize);
     
     /// Replaces the geneSize entries of oldGene with the geneSize entries of newGene. This corresponds to replacing
     /// an individual (essentially a gene and a fitness value based thereon) of a population with a new one.

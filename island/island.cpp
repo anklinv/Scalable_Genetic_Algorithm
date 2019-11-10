@@ -335,6 +335,69 @@ void Island::crowdingReplacement(int geneSize, int islandSize, // TODO: change a
 }
 
 
+int Island::computeSendBufferSize() {
+    
+    switch(MIGRATION_TOPOLOGY) {
+            
+        case MigrationTopology::FULLY_CONNECTED:
+            
+            int numSenders = NUM_ACTIVE_ISLANDS - 1;
+            
+            if (NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION % numSenders == 0) {
+                return max(1, NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION / numSenders);
+            } else {
+                return max(1, NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION / numSenders + 1);
+            }
+            break;
+            
+        case MigrationTopology::ISOLATED:
+            
+            return 0;
+            break;
+            
+        case MigrationTopology::RING:
+            
+            return NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION;
+            break;
+            
+        default:
+            
+            return -1; // error
+            break;
+    } // end switch case
+    
+}
+
+
+int Island::computeReceiveBufferSize(int sendBufferSize) { // TODO: currently adjusted to MPI_Allgather fix this
+    
+    switch (MIGRATION_TOPOLOGY) {
+            
+        case MigrationTopology::FULLY_CONNECTED:
+            
+            // number of senders MPI_Allgather
+            return sendBufferSize * NUM_ACTIVE_ISLANDS;
+            break;
+            
+        case MigrationTopology::ISOLATED:
+            
+            return 0;
+            break;
+            
+        case MigrationTopology::RING:
+            
+            return sendBufferSize;
+            break;
+            
+        default:
+            
+            return -1; // error
+            break;
+    } // end switch case
+    
+}
+
+
 double Island::solve() {
     
     // For MPI_Allgather and to compute how much data is received
