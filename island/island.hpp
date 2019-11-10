@@ -133,7 +133,10 @@ private:
     
     /// Number of active islands. Has to be equal to the number of ranks in MPI_COMM_WORLD.  It is
     /// necessary that all ranks in MPI_COMM_WORLD execute the GA simultaneously.
-    const int NUM_ACTIVE_ISLANDS;
+    const int NUM_ACTIVE_ISLANDS; // TODO: replace this with SIZE_COMM_WORLD or similar
+    
+    /// The ID of the rank (process) in which the Island is created
+    const int RANK_ID;
     
 
     /// Selection policy (source island)
@@ -149,6 +152,30 @@ private:
     /// The total number of evolution steps after which the genetic algorithm terminates.
     const int NUM_EVOLUTIONS;
     
+    // TODO: fix interaction between TSP and Island
+    const int GENE_SIZE;
+    
+    // TODO: maybe make these const
+    int numIndividualsSendBuffer;
+    
+    int numIndividualsReceiveBuffer;
+    
+    // TODO: allocate these inside constructor (->heap? check this)
+    // TODO: deallocate these inside destructor
+    int* sendBufferGenes;
+    
+    double* sendBufferFitness;
+    
+    int* receiveBufferGenes;
+    
+    double* receiveBufferFitness;
+    
+    /// Transfers the data stored inside the send buffers according to the MIGRATION_TOPOLOGY in a synchronized
+    /// and blocking fashion. The data received is stored inside the receive buffers as the function returns.
+    void doSynchronousBlockingCommunication();
+    
+    /// Uses the SELECTION_POLICY to fill sendBufferFitnesses and sendBufferGenes with data.
+    void fillSendBuffers()
     
     /// Computes the size of the send buffer. The size of the send buffer depends on MIGRATION_TOPOLOGY and
     /// NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION. Called once in the constructor.
@@ -157,7 +184,7 @@ private:
     /// Computes the size of the receive buffer. The size of the receive buffer differs from NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION
     /// because of the internal use of MPI_Allgather and the case where the immigrants cannot be evenly distributed among
     /// senders. Called once in the constructor.
-    int computeReceiveBufferSize(int sendBufferSize);
+    int computeReceiveBufferSize(int sendBufferSize); // TODO: sendBufferSize could be accessed via object variable
     
     /// Replaces the geneSize entries of oldGene with the geneSize entries of newGene. This corresponds to replacing
     /// an individual (essentially a gene and a fitness value based thereon) of a population with a new one.
@@ -183,7 +210,7 @@ private:
     /// Does stochastic universal sampling. This function does two O(n) linear passes over the fitness values where n is the
     /// population size. Returns the indices of the numIndividualsToSample selected individuals as array.
     int* stochasticUniversalSampling(double* fitness, int numIndividuals, // TODO: change access pattern to these variables
-                                     int numIndividualsToSample, int* sampledIndividuals);
+                                     int numIndividualsToSample);
     
     /// Does tournament selection. Returns the indices of numIndividualsToSample selected individuals as array. For each
     /// individual to be selected, tournamentSize individuals are sampled uniformly at random and the best individual thereof

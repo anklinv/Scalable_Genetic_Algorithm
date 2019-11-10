@@ -335,7 +335,7 @@ void Island::crowdingReplacement(int geneSize, int islandSize, // TODO: change a
 }
 
 
-int Island::computeSendBufferSize() {
+int Island::computeSendBufferSize() { // TODO: could be implemented in a more functional way
     
     switch(MIGRATION_TOPOLOGY) {
             
@@ -369,6 +369,7 @@ int Island::computeSendBufferSize() {
 }
 
 
+// TODO: could be implemented in a more functional way
 int Island::computeReceiveBufferSize(int sendBufferSize) { // TODO: currently adjusted to MPI_Allgather fix this
     
     switch (MIGRATION_TOPOLOGY) {
@@ -393,6 +394,106 @@ int Island::computeReceiveBufferSize(int sendBufferSize) { // TODO: currently ad
             
             return -1; // error
             break;
+    } // end switch case
+    
+}
+
+
+void Island::fillSendBuffers() { // TODO: could be implemented in a more functional way
+    
+    int* migrants; // store indices of individuals
+    
+    
+    switch(SELECTION_POLICY) {
+        
+        case SelectionPolicy::TRUNCATION:
+            
+            migrants = truncationSelection(numIndividualsSendBuffer);
+            break;
+        
+        case SelectionPolicy::FITNESS_PROPORTIONATE_SELECTION:
+            
+            migrants = fitnessProportionateSelection(numIndividualsSendBuffer);
+            break;
+        
+        case SelectionPolicy::STOCHASTIC_UNIVERSAL_SAMPLING:
+            
+            migrants = stochasticUniversalSampling(numIndividualsSendBuffer);
+            break;
+            
+        case SelectionPolicy::TOURNAMENT_SELECTION:
+            
+            migrants = tournamentSelection(3, numIndividualsSendBuffer); // TODO: allow for tournament size as a parameter
+            break;
+            
+        case SelectionPolicy::PURE_RANDOM:
+            
+            pureRandomSelection(numIndividualsSendBuffer);
+            break;
+            
+    } // end switch case
+    
+    
+    for(int migrantIdx = 0; migrantIdx < numIndividualsSendBuffer; migrantIdx++) {
+        
+        // simply copy array
+        overwriteGene((this->tsp)->getGene(migrants[migrantIdx]), sendBufferGenes[migrantIdx * GENE_SIZE], GENE_SIZE); // TODO: fix access
+    }
+    
+    for(int migrantIdx = 0; migrantIdx < numIndividualsSendBuffer; migrantIdx++) {
+        
+        sendBufferFitness[migrantIdx] = (this->tsp)->getFitness(migrants[migrantIdx]);
+    }
+    
+}
+
+
+void Island::doSynchronousBlockingCommunication() { // TODO: could be implemented in a more functional way
+    
+    switch(MIGRATION_TOPOLOGY) {
+        
+        case MigrationTopology::FULLY_CONNECTED:
+            
+            // "Gathers data from all tasks and distribute the combined data to all tasks"
+            // - I suppose this is synchronized
+            // - amount of data sent == amount of data received from any process
+            MPI_Allgather(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
+                          receiveBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE, MPI_COMM_WORLD);
+            
+            MPI_Allgather(sendBufferGenes, numIndividualsSendBuffer * GENE_SIZE, MPI_INT,
+                          receiveBufferGenes, numIndividualsSendBuffer * GENE_SIZE, MPI_INT, MPI_COMM_WORLD);
+            break;
+        
+        case MigrationTopology::ISOLATED:
+            
+            int status = MPI_Barrier(MPI_COMM_WORLD); // Synchronize islands
+            // could check status == MPI_SUCCESS
+            break;
+        
+        case MigrationTopology::RING:
+            
+            // A cyclic list seems to be a good use case for MPI_Sendrecv
+            
+            int destRankID = (RANK_ID + 1) % NUM_ACTIVE_ISLANDS;
+            
+            const int FITNESS_TAG = 0x01011;
+            const int GENE_TAG = 0x01100;
+            
+            
+            int status = MPI_Sendrecv(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
+                                      destRankID, FITNESS_TAG,
+                                      receiveBufferFitness, numIndividualsReceiveBuffer, MPI_DOUBLE,
+                                      RANK_ID, FITNESS_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // could check status == MPI_SUCCESS
+            
+            status = MPI_Sendrecv(sendBufferGenes, numIndividualsSendBuffer * GENE_SIZE, MPI_INT,
+                                  destRankID, GENE_TAG,
+                                  receiveBufferGenes, numIndividualsReceiveBuffer * GENE_SIZE, MPI_INT,
+                                  RANK_ID, GENE_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // could check status == MPI_SUCCESS
+            
+            break;
+        
     } // end switch case
     
 }
