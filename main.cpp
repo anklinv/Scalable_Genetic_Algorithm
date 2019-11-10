@@ -17,16 +17,16 @@
 using namespace std;
 
 // Global variables (parameters)
-int nr_epochs = 1000;
+int nr_epochs = 5000;
 int nr_individuals = 100;
 bool runIsland = false;
 string data_dir = "data";
-string data_file = "att48.csv";
+string data_file = "ch130.csv";
 string log_dir = "logs/";
 int migration_period = 200;
 int migration_amount = 5;
 int num_migrations = 5;
-int elite_size = 4;
+int elite_size = 8;
 int mutation = 16;
 
 
@@ -218,10 +218,10 @@ int main(int argc, char** argv) {
     assert(number_cities != -1);
 
     // Create problem
-    TravellingSalesmanProblem problem(number_cities, nr_individuals, elite_size, mutation);
+    TravellingSalesmanProblem problem(number_cities, node_edge_mat, nr_individuals, elite_size, mutation);
     problem.set_logger(new Logger(log_dir, rank));
-    problem.cities = node_edge_mat;
 
+    // NAIVE PARALLEL MODEL
     if (not runIsland) {
         auto start = chrono::high_resolution_clock::now();
         double final_distance = problem.solve(nr_epochs, rank);
@@ -260,7 +260,9 @@ int main(int argc, char** argv) {
             cout << "Best final distance overall is " << final_distance << endl;
             cout << "(mean is " << mean << ", std dev is " << stddev << ")" << endl;
         }
-    } else {
+
+    // ISLAND MODEL
+    } else if (runIsland) {
 
         // 1000 epochs is def
         Island island(&problem, migration_period, migration_amount, num_migrations); // period, amount, numPeriods

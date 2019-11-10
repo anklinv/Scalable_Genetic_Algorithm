@@ -9,17 +9,22 @@
 
 using namespace std;
 
-TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, const int population_count,
-        const int elite_size, const int mutation_rate) {
+TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, int* cities,
+        const int population_count, const int elite_size, const int mutation_rate) {
     this->problem_size = problem_size;
     this->population_count = population_count;
     this->elite_size = elite_size;
     this->mutation_rate = mutation_rate;
     this->fitness = vector<double>(population_count, 0.0);
     this->ranks = new int[population_count];
-    this->cities = new int[problem_size * problem_size];
+    this->cities = cities;
     random_device rd;
     this->gen = mt19937(rd());
+
+    // Initialize fields to be initialized later
+    this->logger = nullptr;
+    this->fitness_best = -1;
+    this->fitness_sum = -1;
 
     // TODO: make this nicer
     this->population = new int[population_count*problem_size];
@@ -39,11 +44,11 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
 }
 
 TravellingSalesmanProblem::~TravellingSalesmanProblem() {
-    if (this->logger) delete this->logger;
+    delete this->logger;
 }
 
-void TravellingSalesmanProblem::set_logger(Logger *logger) {
-    this->logger = logger;
+void TravellingSalesmanProblem::set_logger(Logger *_logger) {
+    this->logger = _logger;
 }
 
 void TravellingSalesmanProblem::evolve(const int rank) {
@@ -59,7 +64,26 @@ void TravellingSalesmanProblem::evolve(const int rank) {
 
     // Mutate population
     // start = chrono::high_resolution_clock::now();
+#ifdef debug_evolve
+    cout << "Before:" << endl;
+    for (int i = 0; i < population_count; ++i) {
+        for (int j = 0; j < problem_size; ++j) {
+            cout << this->population[i + population_count * j] << " ";
+        }
+        cout << endl;
+    }
+#endif
+
     this->mutate_population();
+#ifdef debug_evolve
+    cout << "After:" << endl;
+    for (int i = 0; i < population_count; ++i) {
+        for (int j = 0; j < problem_size; ++j) {
+            cout << this->population[i + population_count * j] << " ";
+        }
+        cout << endl;
+    }
+#endif
     // stop = chrono::high_resolution_clock::now();
     // duration = chrono::duration_cast<chrono::microseconds>(stop - start);
     // cout << "\t\tMutation takes: " << duration.count() << "us (rank " << rank << ")" << endl;
@@ -113,10 +137,10 @@ void TravellingSalesmanProblem::rank_individuals() {
     int* pop = new int[this->problem_size];
     for (int i = 0; i < this->population_count; ++i) {
 	pop = this->getGene(i);
-        double fitness = this->evaluate_fitness(pop);
-        this->fitness[i] = fitness;
-        this->fitness_sum += fitness;
-        this->fitness_best = min(this->fitness_best, fitness);
+        double new_fitness = this->evaluate_fitness(pop);
+        this->fitness[i] = new_fitness;
+        this->fitness_sum += new_fitness;
+        this->fitness_best = min(this->fitness_best, new_fitness);
     }
     iota(this->ranks, this->ranks + this->population_count, 0);
     sort(this->ranks, this->ranks + this->population_count, [this] (int i, int j) {
@@ -186,8 +210,8 @@ void TravellingSalesmanProblem::breed_population() {
     for (int i = this->elite_size; i < this->population_count; ++i) {
 	int rand1 = dist(gen);
 	int rand2 = dist(gen);
-	int* parent1 = new int[this->problem_size];
-	int* parent2 = new int[this->problem_size];
+	int* parent1;
+	int* parent2;
 	while (rand1 == rand2) {
 		rand2 = dist(gen);
 	}
@@ -208,22 +232,34 @@ void TravellingSalesmanProblem::breed_population() {
     }
 }
 
-void TravellingSalesmanProblem::mutate(int *individual) {
+void TravellingSalesmanProblem::mutate(int individual) {
     if (rand() % this->mutation_rate == 0) {
         int swap = rand_range(0, this->problem_size - 1);
         int swap_with = rand_range(0, this->problem_size - 1);
-        int city1 = individual[swap];
-        int city2 = individual[swap_with];
-        individual[swap] = city2;
-        individual[swap_with] = city1;
+
+        int city1 = this->population[individual + swap*this->population_count];
+        int city2 = this->population[individual + swap_with*this->population_count];
+        this->population[individual + swap*this->population_count] = city2;
+        this->population[individual + swap_with*this->population_count] = city1;
     }
 }
 
 void TravellingSalesmanProblem::mutate_population() {
-    int* pop = new int[this->problem_size];
     for (int i = this->elite_size / 2; i < this->population_count; ++i) {
-	pop = this->getGene(i);
-        this->mutate(pop);
+#ifdef debug
+        cout << "mutating individual:" << endl;
+        for (int j = 0; j < this->problem_size; ++j) {
+            cout << pop[j] << " ";
+        }
+        cout << endl;
+#endif
+        this->mutate(i);
+#ifdef debug
+        for (int j = 0; j < this->problem_size; ++j) {
+            cout << pop[j] << " ";
+        }
+        cout << endl;
+#endif
     }
 }
 
@@ -250,7 +286,7 @@ double TravellingSalesmanProblem::getMinFitness() {
 int* TravellingSalesmanProblem::getGene(int indivIdx) {
     int* pop = new int[this->problem_size];
     for (int j = 0; j < this->problem_size; ++j){
-	pop[j] = this->population[indivIdx + this->population_count * j];
+	    pop[j] = this->population[indivIdx + this->population_count * j];
     } 
     return pop;
 }
