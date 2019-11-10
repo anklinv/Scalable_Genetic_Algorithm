@@ -9,6 +9,9 @@
 
 using namespace std;
 
+bool log_all_values = false;
+bool log_best_value = true;
+
 TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, int* cities,
         const int population_count, const int elite_size, const int mutation_rate) {
     this->problem_size = problem_size;
@@ -106,7 +109,12 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
         // auto start = chrono::high_resolution_clock::now();
         this->evolve(rank);
-        this->logger->log_best_fitness_per_epoch(epoch, this->fitness);
+        if (log_all_values) {
+            this->logger->log_all_fitness_per_epoch(epoch, this->fitness);
+        } else if (log_best_value) {
+            this->logger->log_best_fitness_per_epoch(epoch, this->fitness_best);
+        }
+
 #ifdef debug
         // cout << "*** EPOCH " << epoch << " ***" << endl;
         rank_individuals();
@@ -124,7 +132,11 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
     }
 
     this->rank_individuals();
-    this->logger->log_best_fitness_per_epoch(nr_epochs, this->fitness);
+    if (log_all_values) {
+        this->logger->log_all_fitness_per_epoch(nr_epochs, this->fitness);
+    } else if (log_best_value) {
+        this->logger->log_best_fitness_per_epoch(nr_epochs, this->fitness_best);
+    }
 
     this->logger->close();
     return this->fitness_best;
@@ -134,9 +146,8 @@ void TravellingSalesmanProblem::rank_individuals() {
     this->logger->LOG_WC(RANK_INDIVIDUALS_BEGIN);
     this->fitness_sum = 0.0;
     this->fitness_best = std::numeric_limits<typeof(this->fitness_best)>::max();
-    int* pop = new int[this->problem_size];
     for (int i = 0; i < this->population_count; ++i) {
-	pop = this->getGene(i);
+        int* pop = this->getGene(i);
         double new_fitness = this->evaluate_fitness(pop);
         this->fitness[i] = new_fitness;
         this->fitness_sum += new_fitness;
@@ -246,7 +257,7 @@ void TravellingSalesmanProblem::mutate(int individual) {
 
 void TravellingSalesmanProblem::mutate_population() {
     for (int i = this->elite_size / 2; i < this->population_count; ++i) {
-#ifdef debug
+#ifdef debug_mutate
         cout << "mutating individual:" << endl;
         for (int j = 0; j < this->problem_size; ++j) {
             cout << pop[j] << " ";
@@ -254,7 +265,7 @@ void TravellingSalesmanProblem::mutate_population() {
         cout << endl;
 #endif
         this->mutate(i);
-#ifdef debug
+#ifdef debug_mutate
         for (int j = 0; j < this->problem_size; ++j) {
             cout << pop[j] << " ";
         }
