@@ -1,5 +1,6 @@
 #include <ctime>
 #include <sstream>
+#include <iostream>
 #include <iomanip>
 
 #include "logging.hpp"
@@ -39,9 +40,17 @@ void Logger::close() {
     this->tag_file.close();
 }
 
-void Logger::log_best_fitness_per_epoch(int epoch, std::vector<double> fitness) {
+void Logger::log_all_fitness_per_epoch(int epoch, const std::vector<double>& fitness) {
     this->fitness_file << epoch;
-    for (auto f : fitness) this->fitness_file << "," << f;
+    for (auto f : fitness) {
+        this->fitness_file << "," << f;
+    }
+    this->fitness_file << std::endl;
+}
+
+void Logger::log_best_fitness_per_epoch(int epoch, double fitness) {
+    this->fitness_file << epoch;
+    this->fitness_file << "," << fitness;
     this->fitness_file << std::endl;
 }
 

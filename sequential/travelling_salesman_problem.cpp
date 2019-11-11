@@ -5,24 +5,48 @@
 #include <random>
 #include <set>
 #include <chrono>
+#include <array>
+#include <cassert>
 #include "travelling_salesman_problem.hpp"
+
+#define SAFE_DEBUG
+#ifdef SAFE_DEBUG
+#define VAL_POP(i,j) assert(i >= 0); assert(i < this->population_count); assert(j >= 0); assert(j < this->problem_size)
+#define VAL_DIST(i,j) assert(i >= 0); assert(i < this->problem_size); assert(j >= 0); assert(j < this->problem_size)
+#else
+#define VAL_POP(i,j)
+#define VAL_DIST(i,j)
+#endif
+
+#define POP(i,j) this->population[i * this->problem_size + j]
+#define DIST(i,j) this->cities[i * this->problem_size + j]
 
 using namespace std;
 
-TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, const int population_count,
-        const int elite_size, const int mutation_rate) {
+bool log_all_values = false;
+bool log_best_value = true;
+
+TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, float* cities,
+        const int population_count, const int elite_size, const int mutation_rate) {
     this->problem_size = problem_size;
     this->population_count = population_count;
     this->elite_size = elite_size;
     this->mutation_rate = mutation_rate;
     this->fitness = vector<double>(population_count, 0.0);
     this->ranks = new int[population_count];
-    this->cities = new int[problem_size * problem_size];
+    this->cities = cities;
     random_device rd;
     this->gen = mt19937(rd());
 
+    this->log_iter_freq = 100;
+
+    // Initialize fields to be initialized later
+    this->logger = nullptr;
+    this->fitness_best = -1;
+    this->fitness_sum = -1;
+
     // TODO: make this nicer
-    this->population = new int[population_count*problem_size];
+    this->population = new int[population_count * problem_size];
 
     // Randomly initialize the populations
     vector<int> tmp_indices(problem_size);
@@ -33,17 +57,18 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, con
     for (int i = 0; i < population_count; ++i) {
         shuffle(tmp_indices.begin(), tmp_indices.end(), this->gen);
         for (int j = 0; j < problem_size; ++j) {
-            this->population[i + population_count * j] = tmp_indices[j]; //this works
+            VAL_POP(i, j);
+            POP(i,j) = tmp_indices[j]; //this works
         }
     }
 }
 
 TravellingSalesmanProblem::~TravellingSalesmanProblem() {
-    if (this->logger) delete this->logger;
+    delete this->logger;
 }
 
-void TravellingSalesmanProblem::set_logger(Logger *logger) {
-    this->logger = logger;
+void TravellingSalesmanProblem::set_logger(Logger *_logger) {
+    this->logger = _logger;
 }
 
 void TravellingSalesmanProblem::evolve(const int rank) {
@@ -59,14 +84,32 @@ void TravellingSalesmanProblem::evolve(const int rank) {
 
     // Mutate population
     // start = chrono::high_resolution_clock::now();
+#ifdef debug_evolve
+    cout << "Before:" << endl;
+    for (int i = 0; i < population_count; ++i) {
+        for (int j = 0; j < problem_size; ++j) {
+            cout << POP(i,j) << " ";
+        }
+        cout << endl;
+    }
+#endif
+
     this->mutate_population();
+#ifdef debug_evolve
+    cout << "After:" << endl;
+    for (int i = 0; i < population_count; ++i) {
+        for (int j = 0; j < problem_size; ++j) {
+            cout << POP(i,j) << " ";
+        }
+        cout << endl;
+    }
+#endif
     // stop = chrono::high_resolution_clock::now();
     // duration = chrono::duration_cast<chrono::microseconds>(stop - start);
     // cout << "\t\tMutation takes: " << duration.count() << "us (rank " << rank << ")" << endl;
 }
 
 double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
-    
     this->logger->open();
 
 #ifdef debug
@@ -80,9 +123,17 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
 #endif
 
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
+        if (epoch % this->log_iter_freq == 0) {
+            cout << epoch << " of " << nr_epochs << endl;
+        }
         // auto start = chrono::high_resolution_clock::now();
         this->evolve(rank);
-        this->logger->log_best_fitness_per_epoch(epoch, this->fitness);
+        if (log_all_values) {
+            this->logger->log_all_fitness_per_epoch(epoch, this->fitness);
+        } else if (log_best_value) {
+            this->logger->log_best_fitness_per_epoch(epoch, this->fitness_best);
+        }
+
 #ifdef debug
         // cout << "*** EPOCH " << epoch << " ***" << endl;
         rank_individuals();
@@ -100,7 +151,11 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
     }
 
     this->rank_individuals();
-    this->logger->log_best_fitness_per_epoch(nr_epochs, this->fitness);
+    if (log_all_values) {
+        this->logger->log_all_fitness_per_epoch(nr_epochs, this->fitness);
+    } else if (log_best_value) {
+        this->logger->log_best_fitness_per_epoch(nr_epochs, this->fitness_best);
+    }
 
     this->logger->close();
     return this->fitness_best;
@@ -110,13 +165,11 @@ void TravellingSalesmanProblem::rank_individuals() {
     this->logger->LOG_WC(RANK_INDIVIDUALS_BEGIN);
     this->fitness_sum = 0.0;
     this->fitness_best = std::numeric_limits<typeof(this->fitness_best)>::max();
-    int* pop = new int[this->problem_size];
     for (int i = 0; i < this->population_count; ++i) {
-	pop = this->getGene(i);
-        double fitness = this->evaluate_fitness(pop);
-        this->fitness[i] = fitness;
-        this->fitness_sum += fitness;
-        this->fitness_best = min(this->fitness_best, fitness);
+        double new_fitness = this->evaluate_fitness(i);
+        this->fitness[i] = new_fitness;
+        this->fitness_sum += new_fitness;
+        this->fitness_best = min(this->fitness_best, new_fitness);
     }
     iota(this->ranks, this->ranks + this->population_count, 0);
     sort(this->ranks, this->ranks + this->population_count, [this] (int i, int j) {
@@ -125,12 +178,18 @@ void TravellingSalesmanProblem::rank_individuals() {
     this->logger->LOG_WC(RANK_INDIVIDUALS_END);
 }
 
-double TravellingSalesmanProblem::evaluate_fitness(const int *individual) {
+double TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     double route_distance = 0.0;
-    for (int i = 0; i < this->problem_size - 1; ++i) {
-        route_distance += this->cities[individual[i] + this->problem_size * individual[i+1]];		//matrix lookup for a distance between two cities
+    for (int j = 0; j < this->problem_size - 1; ++j) {
+        VAL_POP(individual, j);
+        VAL_POP(individual, j+1);
+        VAL_DIST(POP(individual, j), POP(individual, j + 1));
+        route_distance += DIST(POP(individual, j), POP(individual, j + 1));
     }
-    route_distance += this->cities[individual[this->problem_size-1] + this->problem_size * individual[0]];	//complete the round trip
+    VAL_POP(individual, this->problem_size - 1);
+    VAL_POP(individual, 0);
+    VAL_DIST(POP(individual, this->problem_size - 1), POP(individual, 0));
+    route_distance += DIST(POP(individual, this->problem_size - 1), POP(individual, 0)); //complete the round trip
     return route_distance;
 }
 
@@ -170,14 +229,13 @@ void TravellingSalesmanProblem::breed_population() {
     // Keep the best individuals
     for (int i = 0; i < this->elite_size; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
-            temp_population[i][j] = this->population[this->ranks[i] + this->population_count * j]; //this works
+            temp_population[i][j] = POP(this->ranks[i], j);
         }
     }
 
-    vector<double> correct_fitness;
-    correct_fitness.reserve(this->population_count);
-    for (auto f : this->fitness) {
-        correct_fitness.push_back(1 / pow(f / this->fitness_sum, 4));
+    vector<double> correct_fitness(this->population_count);
+    for (int i = 0; i < this->population_count; ++i) {
+        correct_fitness[i] = 1 / pow(this->fitness[i] / this->fitness_sum, 4);
     }
 
     auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());
@@ -186,11 +244,9 @@ void TravellingSalesmanProblem::breed_population() {
     for (int i = this->elite_size; i < this->population_count; ++i) {
 	int rand1 = dist(gen);
 	int rand2 = dist(gen);
-	int* parent1 = new int[this->problem_size];
-	int* parent2 = new int[this->problem_size];
-	while (rand1 == rand2) {
-		rand2 = dist(gen);
-	}
+	int* parent1;
+	int* parent2;
+
 	parent1 = this->getGene(rand1);
 	parent2 = this->getGene(rand2);
         this->breed(
@@ -202,28 +258,42 @@ void TravellingSalesmanProblem::breed_population() {
 
     for (int i = 0; i < this->population_count; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
-            this->population[i + this->population_count * j] = temp_population[i][j]; //this doesnt work
-		// cout << this->population[i + this->population_count * j] << endl;
+            VAL_POP(i, j);
+            POP(i, j) = temp_population[i][j];
         }
     }
 }
 
-void TravellingSalesmanProblem::mutate(int *individual) {
+void TravellingSalesmanProblem::mutate(int individual) {
     if (rand() % this->mutation_rate == 0) {
         int swap = rand_range(0, this->problem_size - 1);
         int swap_with = rand_range(0, this->problem_size - 1);
-        int city1 = individual[swap];
-        int city2 = individual[swap_with];
-        individual[swap] = city2;
-        individual[swap_with] = city1;
+
+        VAL_POP(individual, swap);
+        VAL_POP(individual, swap_with);
+        int city1 = POP(individual, swap);
+        int city2 = POP(individual, swap_with);
+        POP(individual, swap) = city2;
+        POP(individual, swap_with) = city1;
     }
 }
 
 void TravellingSalesmanProblem::mutate_population() {
-    int* pop = new int[this->problem_size];
     for (int i = this->elite_size / 2; i < this->population_count; ++i) {
-	pop = this->getGene(i);
-        this->mutate(pop);
+#ifdef debug_mutate
+        cout << "mutating individual:" << endl;
+        for (int j = 0; j < this->problem_size; ++j) {
+            cout << pop[j] << " ";
+        }
+        cout << endl;
+#endif
+        this->mutate(i);
+#ifdef debug_mutate
+        for (int j = 0; j < this->problem_size; ++j) {
+            cout << pop[j] << " ";
+        }
+        cout << endl;
+#endif
     }
 }
 
@@ -250,7 +320,8 @@ double TravellingSalesmanProblem::getMinFitness() {
 int* TravellingSalesmanProblem::getGene(int indivIdx) {
     int* pop = new int[this->problem_size];
     for (int j = 0; j < this->problem_size; ++j){
-	pop[j] = this->population[indivIdx + this->population_count * j];
+        VAL_POP(indivIdx, j);
+	    pop[j] = POP(indivIdx, j);
     } 
     return pop;
 }

@@ -5,6 +5,7 @@ import json
 import argparse
 import itertools
 import datetime
+from shutil import copyfile
 
 default_params = {
     "mode": "sequential",
@@ -72,7 +73,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Running some experiments")
     parser.add_argument('--dry_run', default=False, dest="dry_run", action="store_true",
                         help="Whether to just print the jobs for debugging")
-    parser.add_argument('-e', type=str, default="experiment.json", nargs="+", dest="experiment",
+    parser.add_argument('-e', type=str, default=['experiment.json'], nargs="+", dest="experiment",
                         help="Which experiment file to run")
     args = parser.parse_args()
 
@@ -102,6 +103,7 @@ if __name__ == "__main__":
             else:
                 print("Logging into folder {}".format(logging_location))
                 os.mkdir(logging_location)
+                copyfile(experiment, logging_location + experiment)
 
         # Finished setup
         print("*"*50)

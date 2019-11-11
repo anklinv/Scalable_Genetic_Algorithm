@@ -12,21 +12,43 @@
 #include <chrono>
 #include "sequential/travelling_salesman_problem.hpp"
 #include "island/island.hpp"
-#include <assert.h>
+#include <cassert>
 
 using namespace std;
 
 // Global variables (parameters)
-int nr_epochs = 1000;
+
+// --epochs
+int nr_epochs = 5000;
+
+// --population
 int nr_individuals = 100;
-bool runSequential = true;
+
+// island or sequential
 bool runIsland = false;
+
 string data_dir = "data";
-string data_file = "att48.csv";
+
+// --data
+string data_file = "ch130.csv";
+
+// --log_dir
 string log_dir = "logs/";
+
+// --migration_period
 int migration_period = 200;
+
+// --migration_amount
 int migration_amount = 5;
+
+// --num_migrations
 int num_migrations = 5;
+
+// --elite_size
+int elite_size = 8;
+
+// --mutation
+int mutation = 16;
 
 
 // typedefs
@@ -48,14 +70,12 @@ void parse_args(int argc, char** argv, bool verbose=true) {
     for (int i = 1; i < argc; ++i) {
         // Single arguments
         if (argv[i] == (string) "sequential") {
-            runSequential = true;
             runIsland = false;
             if (verbose) {
                 cout << "Mode " << argv[i] << endl;
             }
         } else if (argv[i] == (string) "island") {
             runIsland = true;
-            runSequential = false;
             if (verbose) {
                 cout << "Mode " << argv[i] << endl;
             }
@@ -134,77 +154,30 @@ void parse_args(int argc, char** argv, bool verbose=true) {
             if (verbose) {
                 cout << "Number of Migrations:\t" << argv[i+1] << endl;
             }
-        }
-    }
-}
-
-double setupAndRunGA(int rank) {
-
-    // TODO: Make this nicer, the files are not as consistent as I hoped.
-    //       The files can be found at http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsp/index.html
-    ifstream input("data/att48.tsp");
-    string name, comment, type, dimension, edge_weight_type, node;
-
-    getline(input, name);
-    name = name.substr(7, name.length());
-
-    getline(input, comment);
-    comment = comment.substr(10, comment.length());
-
-    getline(input, type);
-    type = type.substr(7, type.length());
-
-    getline(input, dimension);
-    dimension = dimension.substr(12, dimension.length());
-
-    getline(input, edge_weight_type);
-    edge_weight_type = edge_weight_type.substr(18, edge_weight_type.length());
-
-    getline(input, node);
-
-    // Read cities
-    int number_cities = stoi(dimension);
-    int node_edge_mat[number_cities * number_cities];
-    cout << "Reading " << dimension << " cities of problem " << name << "... (rank " << rank << ")" << endl;
-    // Instead of reading city coordinates here, load distance matrix from a preprocessed file
-    input.close();
-
-    // Read city coordinates
-    ifstream input2("data/att48.csv");
-
-    for (int i = 0; i < number_cities; ++i) {
-        string line;
-        getline(input2, line);
-        if(!input2.good()){
-            break;
-        }
-        stringstream iss(line);
-
-        for (int j = 0; j < number_cities; ++j) {
-            string val;
-            getline(iss, val, ';');
-            if(!iss.good()){
-                break;
+        } else if (argv[i] == (string) "--elite_size") {
+            assert(i + 1 < argc);
+            try {
+                elite_size = stoi(argv[i+1]);
+            } catch (const std::invalid_argument &e) {
+                cerr << "Invalid integer for " << argv[i] << endl;
+                exit(1);
             }
-            stringstream converter(val);
-            converter >> node_edge_mat[i + number_cities * j];
+            if (verbose) {
+                cout << "Elite size:\t" << argv[i+1] << endl;
+            }
+        } else if (argv[i] == (string) "--mutation") {
+            assert(i + 1 < argc);
+            try {
+                mutation = stoi(argv[i+1]);
+            } catch (const std::invalid_argument &e) {
+                cerr << "Invalid integer for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose) {
+                cout << "Mutation:\t" << argv[i+1] << endl;
+            }
         }
     }
-    input2.close();
-    cout << "Done!" << endl;
-
-    TravellingSalesmanProblem problem(number_cities, nr_individuals, 10, 16);
-    problem.set_logger(new Logger(log_dir, rank));
-    problem.cities = node_edge_mat;
-
-    // Solve problem
-    double final_distance;
-    final_distance = problem.solve(nr_epochs, rank);
-    cout << "Final distance is " << final_distance << " (rank " << rank << ")" << endl;
-
-    // TODO: Graph, maybe visualization
-
-    return final_distance;
 }
 
 double computeStdDev(vec_d data) {
@@ -226,6 +199,37 @@ double computeMean(vec_d data) {
 
     double sum = accumulate(data.begin(), data.end(), 0.0);
     return sum / data.size();
+}
+
+void read_input(int &num_cities, float*& cities_matrix) {
+    // READ INPUT
+    ifstream input(data_dir + "/" + data_file);
+    // Read number of cities
+    string dim;
+    getline(input, dim);
+    num_cities = stoi(dim);
+    cout << "number of cities: " << num_cities << endl;
+    cities_matrix = new float[num_cities * num_cities];
+    // Read values
+    for (int i = 0; i < num_cities; ++i) {
+        string line;
+        getline(input, line);
+        if(!input.good()){
+            break;
+        }
+        stringstream iss(line);
+
+        for (int j = 0; j < num_cities; ++j) {
+            string val;
+            getline(iss, val, ';');
+            if(!iss.good()){
+                break;
+            }
+            stringstream converter(val);
+            converter >> cities_matrix[i + num_cities * j];
+        }
+    }
+    input.close();
 }
 
 // Data file
@@ -250,11 +254,21 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    if (runSequential) {
+    // Read input
+    int number_cities = -1;
+    float* node_edge_mat;
+    read_input(number_cities, node_edge_mat);
+    assert(number_cities != -1);
 
-        // reads the graph from a file and runs the GA
+    // Create problem
+    TravellingSalesmanProblem problem(number_cities, node_edge_mat, nr_individuals, elite_size, mutation);
+    problem.set_logger(new Logger(log_dir, rank));
+
+    // NAIVE PARALLEL MODEL
+    if (not runIsland) {
         auto start = chrono::high_resolution_clock::now();
-        double final_distance = setupAndRunGA(rank);
+        double final_distance = problem.solve(nr_epochs, rank);
+        cout << "Final distance is " << final_distance << " (rank " << rank << ")" << endl;
         auto stop = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
         cout << duration.count() << " ms total runtime (rank " << rank << ")" << endl;
@@ -275,7 +289,7 @@ int main(int argc, char** argv) {
             all_dists.push_back(final_distance);
 
             // receive results from all other ranks
-            for(int i = 0; i < numProcesses - 1; i++) {
+            for (int i = 0; i < numProcesses - 1; i++) {
 
                 MPI_Recv(&buff, 1, MPI_DOUBLE, MPI_ANY_SOURCE, DATA_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
@@ -290,68 +304,8 @@ int main(int argc, char** argv) {
             cout << "(mean is " << mean << ", std dev is " << stddev << ")" << endl;
         }
 
-    } // end runSequential
-
-
-    if (runIsland) {
-        // TODO: Make this nicer, the files are not as consistent as I hoped.
-        //       The files can be found at http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsp/index.html
-        ifstream input("data/att48.tsp");
-        string name, comment, type, dimension, edge_weight_type, node;
-
-        getline(input, name);
-        name = name.substr(7, name.length());
-
-        getline(input, comment);
-        comment = comment.substr(10, comment.length());
-
-        getline(input, type);
-        type = type.substr(7, type.length());
-
-        getline(input, dimension);
-        dimension = dimension.substr(12, dimension.length());
-
-        getline(input, edge_weight_type);
-        edge_weight_type = edge_weight_type.substr(18, edge_weight_type.length());
-
-        getline(input, node);
-
-        // Read cities
-        int number_cities = stoi(dimension);
-        int node_edge_mat[number_cities * number_cities];
-        cout << "Reading " << dimension << " cities of problem " << name << "... (rank " << rank << ")" << endl;
-        // Instead of reading city coordinates here, load distance matrix from a preprocessed file
-        input.close();
-
-        // Read city coordinates
-        ifstream input2("data/att48.csv");
-
-        for (int i = 0; i < number_cities; ++i) {
-            string line;
-            getline(input2, line);
-            if(!input2.good()){
-                break;
-            }
-            stringstream iss(line);
-
-            for (int j = 0; j < number_cities; ++j) {
-                string val;
-                getline(iss, val, ';');
-                if(!iss.good()){
-                    break;
-                }
-                stringstream converter(val);
-                converter >> node_edge_mat[i + number_cities * j];
-            }
-        }
-        input2.close();
-        cout << "Done!" << endl;
-
-        TravellingSalesmanProblem problem(number_cities, nr_individuals, 10, 16);
-
-        // TODO: Pass log_dir to the logger
-        problem.set_logger(new Logger(log_dir, rank));
-        problem.cities = node_edge_mat;
+    // ISLAND MODEL
+    } else if (runIsland) {
 
         // 1000 epochs is def
         Island island(&problem, migration_period, migration_amount, num_migrations); // period, amount, numPeriods
@@ -362,6 +316,8 @@ int main(int argc, char** argv) {
         }
     } // end runIsland
 
+    // Delete cities matrix
+    delete(node_edge_mat);
 
     MPI_Finalize(); /* requirement for MPI */
 

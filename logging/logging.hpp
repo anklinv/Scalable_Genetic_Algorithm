@@ -32,12 +32,20 @@ public:
     /// Close logging files
     void close();
 
-    /// Store best fitness value after given number of epochs
+    /// Store all the fitness values at a given number of epochs
     /// \param epoch number of finished epochs (0 means initialised)
     /// \param fitness vector of fitness values
-    void log_best_fitness_per_epoch(
+    void log_all_fitness_per_epoch(
         int epoch,
-        std::vector<double> fitness = std::vector<double>()
+        const std::vector<double>& fitness = std::vector<double>()
+    );
+
+    /// Store best fitness value at a given number of epochs
+    /// \param epoch number of finished epochs (0 means initialised)
+    /// \param fitness the fitness value
+    void log_best_fitness_per_epoch(
+            int epoch,
+            double fitness
     );
 
     /// Log a small value quickly

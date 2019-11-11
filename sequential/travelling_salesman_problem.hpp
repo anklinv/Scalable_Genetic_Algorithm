@@ -16,10 +16,11 @@ class TravellingSalesmanProblem {
 public:
     /// Generate a Problem object that can be solved afterwards with .solve()
     /// \param problem_size number of nodes in the graph
+    /// \param cities matrix of the city distances
     /// \param population_count size of the population
     /// \param elite_size number of individuals that survive for sure
     /// \param mutation_rate 1/mutation_rate is the probability that an individual gets a mutation
-    TravellingSalesmanProblem(int problem_size, int population_count, int elite_size, int mutation_rate);
+    TravellingSalesmanProblem(int problem_size, float* cities, int population_count, int elite_size, int mutation_rate);
     ~TravellingSalesmanProblem();
 
     /// Number of nodes in the graph
@@ -35,9 +36,9 @@ public:
     int mutation_rate;
 
     /// 2D coordinates of the cities
-    int* cities;
+    float* cities;
 
-    void set_logger(Logger *logger);
+    void set_logger(Logger *_logger);
 
     /// Solve the problem by evolving for a given number of steps.
     /// \param nr_epochs number of steps to evolve
@@ -77,10 +78,13 @@ private:
     /// For randomness
     std::mt19937 gen;
 
+    /// How often to write
+    int log_iter_freq;
+
     /// Calculate the fitness of an individual, which is the length of the closed path in the graph and return it.
     /// \param individual pointer to an array of size problem_size
     /// \return the length of the path in the graph
-    double evaluate_fitness(const int* individual);
+    double evaluate_fitness(const int individual);
 
     /// Run a single iteration of selection, breeding and mutation
     void evolve(int rank);
@@ -102,7 +106,7 @@ private:
 
     /// Mutate a single individual by randomly flipping some cities in the path
     /// \param individual an array of size this->problem_size
-    void mutate(int *individual);
+    void mutate(int individual);
 
     /// Apply mutation to the whole population
     void mutate_population();
