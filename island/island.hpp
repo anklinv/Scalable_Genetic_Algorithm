@@ -12,44 +12,12 @@
 
 using namespace std;
 
-// COMPLEMENTARY to TOPOLOGY (src rec relation - network)
-// min. 1 ADDITIONAL PARAMETER - throughput: number of individuals to send? OR number of individuals to receive?
-// I think #receive is the more sensible parameter
-// - corresponds to the alteration of the current population
-// - similar to elitism
-// topology then fixes where these #receive new individuals come from
-// - "multiple source (at rec) multiple destination (at src)" data transfer for e.g. fully connected
-// interesting experiments if number of islands n is scaled up drastically
-// (alternatives: fix both, fix send -> cumbersome as calculations necessary)
-// (circumventions for "special cases" necessary in all cases i guess e.g. truncation for quantity conversion)
-// functional dependency q_rec = f(q_sel, t) where t is TOPOLOGY
-// maybe add this to NETWORK struct
 
-// function to compute size of send buffer
-// dependency f(TOPOLOGY, NUM_RECEIVE)
-// -> size independent of selection policy (any policy can be used to select q individuals)
-// -> outgoing delivery packet, same for all edges
-// size = min(1, f(q_sel, t)) -> otherwise the TOPOLOGY PARAMETER would not make much sense
-
-// function to compute size of receive buffer
-// dependency f(NUM_RECEIVE)
-
-// functions to fill send buffer
-// dependency f(SELECTION_POLICY)
-
-// ---- SYNCHRONOUS exchange of data (needs send buffer & receive buffer) ----
-// Allgather for synchronous case
-// send buffer, receive buffer are already set up
-// do cleanup here (i.e. somehow remove redundant data e.g. with pointers or find some other MPI function)
-
-// function to integrate data
-// dependency f(REPLACEMENT_POLICY)
-
-
-// ASYNCHRONOUS
-// while loop with periodic checking
-// nonblocking send and receive with periodic checking
+// TODO: ASYNCHRONOUS
+// e.g. loop with periodic checking
+// e.g. nonblocking send and receive with periodic checking
 // cf lecture
+
 
 class Island {
     
@@ -84,9 +52,9 @@ public:
     
     
     enum MigrationTopology {
-        FULLY_CONNECTED,
-        ISOLATED,
-        RING // 1D directed grid
+        FULLY_CONNECTED, // ok
+        ISOLATED, // ok
+        RING // 1D directed grid - ok
     };
 
     enum SelectionPolicy {
@@ -99,8 +67,8 @@ public:
 
     enum ReplacementPolicy {
         TRUNCATION, // ok
-        DEJONG_CROWDING, // ok
-        PURE_RANDOM // ok
+        PURE_RANDOM, // ok
+        DEJONG_CROWDING // ok
     };
     
     
@@ -169,6 +137,9 @@ private:
     int* receiveBufferGenes;
     
     double* receiveBufferFitness;
+    
+    /// Empties the receive buffers and integrates the data into the current Island data according to the REPLACEMENT_POLICY.
+    void emptyReceiveBuffers();
     
     /// Transfers the data stored inside the send buffers according to the MIGRATION_TOPOLOGY in a synchronized
     /// and blocking fashion. The data received is stored inside the receive buffers as the function returns.
@@ -243,7 +214,7 @@ private:
     /// Distance to the immigrant is replaced. It is possible that an immigrant is itself replaced by a subsequent one.
     void crowdingReplacement(int geneSize, int islandSize, // TODO: change access to these variables
                              int crowdSize,
-                             int numImmigrants, double* immigrantFitnesses, int** immigrantGenes)
+                             int numImmigrants, int** immigrantGenes, double* immigrantFitnesses)
     
 };
 

@@ -223,9 +223,12 @@ int* Island::pureRandomSelection(int numIndividuals, // TODO: change access to t
 
 
 void Island::truncationReplacement(const TravellingSalesmanProblem* tsp, int geneSize, int islandSize, // TODO: change access to this. Use the tsp pointer.
-                                   int numImmigrants, int** immigrantGenes, double* immigrantFitnesses) {
+                                   int numImmigrants, int* immigrantGenes, double* immigrantFitnesses) {
     
     // TODO: change access to ranks
+    
+    // TODO: IGNORE OWN DATA HERE
+    
     int* ranks = (this->tsp)->getRanks();
     
     // Use (idx, fitness) pairs to facilitate sorting
@@ -275,7 +278,7 @@ void Island::truncationReplacement(const TravellingSalesmanProblem* tsp, int gen
     for(int indivIdx = 0; indivIdx < numToReplace; indivIdx++) {
         
         int* currGene = (this->tsp)->getGene(ranks[(islandSize - numImmigrants) + indivIdx]);
-        int* newGene = immigrantGenes[immigrants[indivIdx].idx];
+        int* newGene = immigrantGenes[immigrants[indivIdx].idx * GENE_SIZE];
         
         overwriteGene(newGene, currGene, geneSize);
         
@@ -287,14 +290,14 @@ void Island::truncationReplacement(const TravellingSalesmanProblem* tsp, int gen
 
 
 void Island::pureRandomReplacement(int islandSize, int geneSize, // TODO: change access to these variables
-                                   int numImmigrants, int** immigrantGenes, double* immigrantFitnesses) {
+                                   int numImmigrants, int* immigrantGenes, double* immigrantFitnesses) {
     
     for(int immigrantIdx = 0; immigrantIdx < numImmigrants; immigrantIdx++) {
         
         int indivToReplace = rand() % islandSize;
         
         int* currGene = (this->tsp)->getGene(indivToReplace);
-        int* newGene = immigrantGenes[immigrantIdx];
+        int* newGene = immigrantGenes[immigrantIdx * GENE_SIZE];
         
         overwriteGene(newGene, currGene, geneSize);
         
@@ -306,7 +309,7 @@ void Island::pureRandomReplacement(int islandSize, int geneSize, // TODO: change
 
 void Island::crowdingReplacement(int geneSize, int islandSize, // TODO: change access to these variables
                                  int crowdSize,
-                                 int numImmigrants, double* immigrantFitnesses, int** immigrantGenes) {
+                                 int numImmigrants, int* immigrantGenes, double* immigrantFitnesses) {
     
     for(int immigrantIdx = 0; immigrantIdx < numImmigrants; immigrantIdx++) {
         
@@ -316,7 +319,7 @@ void Island::crowdingReplacement(int geneSize, int islandSize, // TODO: change a
         for(int crowdIdx = 0; crowdIdx < crowdSize; crowdIdx++) {
             
             int randIndivIdx = rand() % islandSize;
-            int currHammingDist = computeHammingDistance(immigrantGenes[immigrantIdx],
+            int currHammingDist = computeHammingDistance(immigrantGenes[immigrantIdx * GENE_SIZE],
                                                          (this->tsp)->getGene(randIndivIdx));
             
             if (currHammingDist < minHammingDist) {
@@ -494,6 +497,32 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
             
             break;
         
+    } // end switch case
+    
+}
+
+
+void Island::emptyReceiveBuffers() {
+    
+    switch(REPLACEMENT_POLICY) { // TODO: remove some parameters and access these values from object variables instead
+            // TODO: fix crowding replacement parameter
+            // TODO: maybe use a object variable function pointer which is set inside the constructor
+            
+        case ReplacementPolicy::TRUNCATION:
+            
+            truncationReplacement(numIndividualsReceiveBuffer, receiveBufferGenes, receiveBufferFitness);
+            break;
+        
+        case ReplacementPolicy::PURE_RANDOM:
+            
+            pureRandomReplacement(numIndividualsReceiveBuffer, receiveBufferGenes, receiveBufferFitness)
+            break;
+            
+        case ReplacementPolicy::DEJONG_CROWDING:
+            
+            crowdingReplacement(3, numIndividualsReceiveBuffer, receiveBufferGenes, receiveBufferFitness);
+            break;
+            
     } // end switch case
     
 }
