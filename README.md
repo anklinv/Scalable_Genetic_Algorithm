@@ -16,10 +16,21 @@ Run the program:
 #### Login to Leonhard
 Note: you need to be in the ETH network! (use VPN)
 ```ssh <netz>@login.leonhard.ethz.ch```
-#### Load C++ compiler
+
+#### Load Modules
 ```module load gcc/8.2.0```
-#### Load MPI
+
 ```module load openmpi/4.0.1```
+
+To avoid typing this in at every login, you can also add it to your `.bashrc` file using the following commands (you only need to do this once):
+```
+cd ~
+echo "module load gcc/8.2.0" >> .bashrc
+echo "module load openmpi/4.0.1" >> .bashrc
+```
+
+(if you ever need to remove it again, just open `.bashrc` and delete the last two lines again.
+
 #### Compile
 ```mpiCC main.cpp sequential/travelling_salesman_problem.cpp logging/logging.cpp```
 #### Test if it works
