@@ -149,12 +149,12 @@ int main(int argc, char** argv) {
         problem.cities = node_edge_mat;
         
         // 1000 epochs is def
-        Island island(&problem, 200, 5, 5); // period, amount, numPeriods
-        double bestDistance = island.solve();
+        //Island island(&problem, 200, 5, 5); // period, amount, numPeriods
+        //double bestDistance = island.solve();
         
-        if(rank == 0) {
-            cout << "Best final distance overall is " << bestDistance << endl;
-        }
+        //if(rank == 0) {
+        //    cout << "Best final distance overall is " << bestDistance << endl;
+        //}
     } // end runIsland
     
     
