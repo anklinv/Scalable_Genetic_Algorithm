@@ -17,16 +17,37 @@
 using namespace std;
 
 // Global variables (parameters)
+
+// --epochs
 int nr_epochs = 5000;
+
+// --population
 int nr_individuals = 100;
+
+// island or sequential
 bool runIsland = false;
+
 string data_dir = "data";
+
+// --data
 string data_file = "ch130.csv";
+
+// --log_dir
 string log_dir = "logs/";
+
+// --migration_period
 int migration_period = 200;
+
+// --migration_amount
 int migration_amount = 5;
+
+// --num_migrations
 int num_migrations = 5;
+
+// --elite_size
 int elite_size = 8;
+
+// --mutation
 int mutation = 16;
 
 
@@ -132,6 +153,28 @@ void parse_args(int argc, char** argv, bool verbose=true) {
             }
             if (verbose) {
                 cout << "Number of Migrations:\t" << argv[i+1] << endl;
+            }
+        } else if (argv[i] == (string) "--elite_size") {
+            assert(i + 1 < argc);
+            try {
+                elite_size = stoi(argv[i+1]);
+            } catch (const std::invalid_argument &e) {
+                cerr << "Invalid integer for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose) {
+                cout << "Elite size:\t" << argv[i+1] << endl;
+            }
+        } else if (argv[i] == (string) "--mutation") {
+            assert(i + 1 < argc);
+            try {
+                mutation = stoi(argv[i+1]);
+            } catch (const std::invalid_argument &e) {
+                cerr << "Invalid integer for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose) {
+                cout << "Mutation:\t" << argv[i+1] << endl;
             }
         }
     }
