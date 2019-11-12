@@ -145,7 +145,7 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
             }
             // cout << endl;
         }
-
+#endif
         // auto stop = chrono::high_resolution_clock::now();
         // auto duration = chrono::duration_cast<chrono::microseconds>(stop - start);
         // cout << "\t" << duration.count() << " us epoch runtime (epoch " << epoch << " rank " << rank << ")" << endl;
