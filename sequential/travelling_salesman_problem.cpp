@@ -52,28 +52,28 @@ void TravellingSalesmanProblem::evolve(const int rank) {
     this->rank_individuals();
     auto stop = chrono::high_resolution_clock::now();
     auto duration = chrono::duration_cast<chrono::microseconds>(stop - start);
-    cout << "\t\tRanking takes: " << duration.count() << "us (rank " << rank << ")" << endl;
+    //cout << "\t\tRanking takes: " << duration.count() << "us (rank " << rank << ")" << endl;
     
     // Breed children
     start = chrono::high_resolution_clock::now();
     this->breed_population();
     stop = chrono::high_resolution_clock::now();
     duration = chrono::duration_cast<chrono::microseconds>(stop - start);
-    cout << "\t\tBreeding takes: " << duration.count() << "us (rank " << rank << ")" << endl;
+    //cout << "\t\tBreeding takes: " << duration.count() << "us (rank " << rank << ")" << endl;
 
     // Mutate population
     start = chrono::high_resolution_clock::now();
     this->mutate_population();
     stop = chrono::high_resolution_clock::now();
     duration = chrono::duration_cast<chrono::microseconds>(stop - start);
-    cout << "\t\tMutation takes: " << duration.count() << "us (rank " << rank << ")" << endl;
+    //cout << "\t\tMutation takes: " << duration.count() << "us (rank " << rank << ")" << endl;
 }
 
 double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
     
     this->logger->open();
 
-#ifdef debug
+/*#ifdef debug
     this->rank_individuals();
     for (int i = 0; i < this->population_count; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
@@ -81,13 +81,13 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
         }
         cout << "\tfit: " << this->fitness[i] << endl;
     }
-#endif
+#endif*/
 
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
         auto start = chrono::high_resolution_clock::now();
         this->evolve(rank);
         this->logger->log_best_fitness_per_epoch(epoch, this->fitness);
-#ifdef debug
+/*#ifdef debug
         cout << "*** EPOCH " << epoch << " ***" << endl;
         rank_individuals();
         for (int i = 0; i < this->population_count; ++i) {
@@ -97,10 +97,10 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
             }
             cout << endl;
         }
-#endif
+#endif*/
         auto stop = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::microseconds>(stop - start);
-        cout << "\t" << duration.count() << " us epoch runtime (epoch " << epoch << " rank " << rank << ")" << endl;
+        // cout << "\t" << duration.count() << " us epoch runtime (epoch " << epoch << " rank " << rank << ")" << endl;
     }
 
     this->rank_individuals();
@@ -205,7 +205,7 @@ void TravellingSalesmanProblem::breed_population() {
     for (int i = 0; i < this->population_count; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             this->population[i + this->population_count * j] = temp_population[i][j]; //this doesnt work
-		cout << this->population[i + this->population_count * j] << endl;
+		//cout << this->population[i + this->population_count * j] << endl;
         }
     }
 }
@@ -233,20 +233,24 @@ int TravellingSalesmanProblem::rand_range(const int &a, const int&b) {
     return (rand() % (b - a + 1) + a);
 }
 
-int* TravellingSalesmanProblem::getRanks() {
-    return (this->ranks);
+int* TravellingSalesmanProblem::getRanks() { // for Island
+    return ranks;
 }
 
-double TravellingSalesmanProblem::getFitness(int indivIdx) {
-    return (this->fitness)[indivIdx];
+int* TravellingSalesmanProblem::getGenes() { // for Island
+    return population;
 }
 
-void TravellingSalesmanProblem::setFitness(int indivIdx, double fitness) {
-    (this->fitness)[indivIdx] = fitness;
+double TravellingSalesmanProblem::getFitness(int indivIdx) { // for Island
+    return fitness[indivIdx];
 }
 
-double TravellingSalesmanProblem::getMinFitness() {
-    return *min_element((this->fitness).begin(), (this->fitness).end());
+void TravellingSalesmanProblem::setFitness(int indivIdx, double newFitness) { // for Island
+    fitness[indivIdx] = newFitness;
+}
+
+double TravellingSalesmanProblem::getMinFitness() { // for Island
+    return *min_element(fitness.begin(), fitness.end());
 }
 
 int* TravellingSalesmanProblem::getGene(int indivIdx) {

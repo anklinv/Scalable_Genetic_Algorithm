@@ -39,16 +39,16 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
     // settings
-    bool runSequential = true;
-    bool runIsland = false;
+    bool runSequential = false;
+    bool runIsland = true;
     
     
     // reads the graph from a file and runs the GA
-    auto start = chrono::high_resolution_clock::now();
+    /*auto start = chrono::high_resolution_clock::now();
     double final_distance = setupAndRunGA(rank);
     auto stop = chrono::high_resolution_clock::now();
     auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-    cout << duration.count() << " ms total runtime (rank " << rank << ")" << endl;
+    cout << duration.count() << " ms total runtime (rank " << rank << ")" << endl;*/
     
     if(runSequential == true) {
     
@@ -151,6 +151,16 @@ int main(int argc, char** argv) {
         // 1000 epochs is def
         //Island island(&problem, 200, 5, 5); // period, amount, numPeriods
         //double bestDistance = island.solve();
+        
+        
+        Island island(problem, Island::MigrationTopology::ISOLATED, 5, 200,
+                      Island::SelectionPolicy::PURE_RANDOM,
+                      Island::ReplacementPolicy::PURE_RANDOM);
+        
+        double bestDistance = island.solve(400);
+        
+        cout << bestDistance << endl;
+        
         
         //if(rank == 0) {
         //    cout << "Best final distance overall is " << bestDistance << endl;

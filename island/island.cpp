@@ -5,7 +5,7 @@
 using namespace std;
 
 
-Island::Island(TravellingSalesmanProblem TSP,
+Island::Island(TravellingSalesmanProblem& TSP,
                const MigrationTopology mt, const int numIndivsReceivedPerMigration, const int migrationPeriod,
                const SelectionPolicy sp, const ReplacementPolicy rp):
 TSP(TSP),
@@ -14,19 +14,46 @@ NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION(numIndivsReceivedPerMigration),
 MIGRATION_PERIOD(migrationPeriod),
 SELECTION_POLICY(sp),
 REPLACEMENT_POLICY(rp) { // initializer list
+        
+    int status;
     
-    MPI_Comm_rank(MPI_COMM_WORLD, &rankID);
+    status = MPI_Comm_rank(MPI_COMM_WORLD, &rankID);
+    assert(status == MPI_SUCCESS);
     MPI_Comm_size(MPI_COMM_WORLD, &sizeCommWorld);
+    assert(status == MPI_SUCCESS);
+        
     
+    // convenience variables
     numIntegersGene = TSP.problem_size;
     numIndividualsIsland = TSP.population_count;
     
+    ranks = TSP.getRanks();
+    genes = TSP.getGenes();
+    
+    
+    // allocate buffers
     numIndividualsSendBuffer = computeSendBufferSize();
     numIndividualsReceiveBuffer = computeReceiveBufferSize(numIndividualsSendBuffer);
     
+    sendBufferGenes = new int[numIndividualsSendBuffer * numIntegersGene];
+    sendBufferFitness = new double[numIndividualsSendBuffer];
     
+    receiveBufferGenes = new int[numIndividualsReceiveBuffer * numIntegersGene];
+    receiveBufferFitness = new double[numIndividualsReceiveBuffer];
     
-};
+}
+
+
+Island::~Island() {
+    
+    // free buffers
+    delete sendBufferGenes;
+    delete sendBufferFitness;
+    
+    delete receiveBufferGenes;
+    delete receiveBufferFitness;
+    
+}
 
 
 void Island::overwriteGene(int* newGene, int* oldGene, int geneSize) {
@@ -34,6 +61,11 @@ void Island::overwriteGene(int* newGene, int* oldGene, int geneSize) {
     for(int geneIdx = 0; geneIdx < geneSize; geneIdx++) {
         oldGene[geneIdx] = newGene[geneIdx];
     }
+    
+    for(int geneIdx = 0; geneIdx < geneSize; geneIdx++)
+        assert(oldGene[geneIdx] == newGene[geneIdx]);
+    
+    assert(newGene + geneSize - 1 < oldGene || oldGene + geneSize - 1 < newGene);
 }
 
 
@@ -45,11 +77,13 @@ int Island::computeHammingDistance(int* firstGene, int* scndGene, int geneSize) 
     while(firstGene[idxFirst] != 1) { // firstGene[idxFirst] == 1
         idxFirst++;
     }
+    assert(0 <= idxFirst && idxFirst < geneSize && firstGene[idxFirst] == 1);
     
     int idxScnd = 0;
     while(scndGene[idxScnd] != 1) { // scndGene[idxScnd] == 1
         idxScnd++;
     }
+    assert(0 <= idxScnd && idxScnd < geneSize && scndGene[idxScnd] == 1);
     
     for(int geneIdx = 0; geneIdx < geneSize; geneIdx++) {
         
@@ -64,8 +98,10 @@ int Island::computeHammingDistance(int* firstGene, int* scndGene, int geneSize) 
     return hammingDistance;
 }
 
-// double* fitness, int numIndividuals, // TODO: change access pattern to these variables
-void Island::tournamentSelection(int tournamentSize, int* sampledIndividuals, int numIndividualsToSample) {
+
+void Island::tournamentSelection(int* sampledIndividuals, int numIndividualsToSample) {
+    
+    int tournamentSize = 3;
         
     for(int sampleIdx = 0; sampleIdx < numIndividualsToSample; sampleIdx++) {
         
@@ -80,7 +116,7 @@ void Island::tournamentSelection(int tournamentSize, int* sampledIndividuals, in
             
             if (TSP.getFitness(indivIdx) < bestFitness) { // smaller fitness value is better
                 bestIdx = indivIdx;
-                bestFitness = TSP.getFitness(indivIdx);
+                bestFitness = TSP.getFitness(indivIdx); // TODO: fix access
             }
         }
         
@@ -91,7 +127,6 @@ void Island::tournamentSelection(int tournamentSize, int* sampledIndividuals, in
 }
 
 
-//double* fitness, int numIndividuals, // TODO: change access pattern to these variables
 void Island::fitnessProportionateSelection(int* sampledIndividuals, int numIndividualsToSample) {
         
     // total fitness for weighting individuals
@@ -151,7 +186,7 @@ void Island::fitnessProportionateSelection(int* sampledIndividuals, int numIndiv
     
 }
 
-//double* fitness, int numIndividuals, // TODO: change access pattern to these variables
+
 void Island::stochasticUniversalSampling(int* sampledIndividuals, int numIndividualsToSample) {
         
     double totalFitness = 0;
@@ -206,18 +241,25 @@ void Island::stochasticUniversalSampling(int* sampledIndividuals, int numIndivid
 }
 
 
-// TODO: needs access to the ranks
 void Island::truncationSelection(int* sampledIndividuals, int numIndividualsToSample) {
-        
+    
+    double lastFitness = -1;
+    double currFitness = -1;
+    
     for(int indivIdx = 0; indivIdx < numIndividualsToSample; indivIdx++) {
      
-        sampledIndividuals[indivIdx] = indivIdx;
+        sampledIndividuals[indivIdx] = ranks[indivIdx];
+        
+        currFitness = TSP.getFitness(ranks[indivIdx]);
+        if (indivIdx != 0) {
+            assert(lastFitness <= currFitness);
+        }
+        lastFitness = currFitness;
     }
     
 }
 
 
-//int numIndividuals, // TODO: change access to this
 void Island::pureRandomSelection(int* sampledIndividuals, int numIndividualsToSample) {
         
     for(int sampleIdx = 0; sampleIdx < numIndividualsToSample; sampleIdx++) {
@@ -227,14 +269,8 @@ void Island::pureRandomSelection(int* sampledIndividuals, int numIndividualsToSa
     
 }
 
-//const TravellingSalesmanProblem* tsp, int geneSize, int islandSize, // TODO: change access to this. Use the tsp pointer.
+
 void Island::truncationReplacement(int numImmigrants, int* immigrantGenes, double* immigrantFitnesses) {
-    
-    // TODO: change access to ranks
-    
-    // TODO: IGNORE OWN DATA HERE
-    
-    int* ranks = TSP.getRanks();
     
     // Use (idx, fitness) pairs to facilitate sorting
     Individual immigrants[numImmigrants];
@@ -282,7 +318,7 @@ void Island::truncationReplacement(int numImmigrants, int* immigrantGenes, doubl
     // - the ranks stored in the TSP object are no longer correct after this step
     for(int indivIdx = 0; indivIdx < numToReplace; indivIdx++) {
         
-        int* currGene = TSP.getGene(ranks[(numIndividualsIsland - numImmigrants) + indivIdx]);
+        int* currGene = &genes[ranks[(numIndividualsIsland - numImmigrants) + indivIdx] * numIntegersGene];
         int* newGene = &immigrantGenes[immigrants[indivIdx].idx * numIntegersGene];
         
         overwriteGene(newGene, currGene, numIntegersGene);
@@ -293,14 +329,14 @@ void Island::truncationReplacement(int numImmigrants, int* immigrantGenes, doubl
     
 }
 
-//int islandSize, int geneSize, // TODO: change access to these variables
+
 void Island::pureRandomReplacement(int numImmigrants, int* immigrantGenes, double* immigrantFitnesses) {
     
     for(int immigrantIdx = 0; immigrantIdx < numImmigrants; immigrantIdx++) {
         
         int indivToReplace = rand() % numIndividualsIsland;
         
-        int* currGene = TSP.getGene(indivToReplace);
+        int* currGene = &genes[indivToReplace * numIntegersGene];
         int* newGene = &immigrantGenes[immigrantIdx * numIntegersGene];
         
         overwriteGene(newGene, currGene, numIntegersGene);
@@ -311,9 +347,9 @@ void Island::pureRandomReplacement(int numImmigrants, int* immigrantGenes, doubl
 }
 
 
-//int geneSize, int islandSize, // TODO: change access to these variables
-void Island::crowdingReplacement(int crowdSize,
-                                 int numImmigrants, int* immigrantGenes, double* immigrantFitnesses) {
+void Island::crowdingReplacement(int numImmigrants, int* immigrantGenes, double* immigrantFitnesses) {
+    
+    int crowdSize = 3;
     
     for(int immigrantIdx = 0; immigrantIdx < numImmigrants; immigrantIdx++) {
         
@@ -324,7 +360,7 @@ void Island::crowdingReplacement(int crowdSize,
             
             int randIndivIdx = rand() % numIndividualsIsland;
             int currHammingDist = computeHammingDistance(&immigrantGenes[immigrantIdx * numIntegersGene],
-                                                         TSP.getGene(randIndivIdx), numIntegersGene);
+                                                         &genes[randIndivIdx * numIntegersGene], numIntegersGene);
             
             if (currHammingDist < minHammingDist) {
                 
@@ -336,7 +372,7 @@ void Island::crowdingReplacement(int crowdSize,
         
         // replace individual
         overwriteGene(&immigrantGenes[immigrantIdx * numIntegersGene],
-                      TSP.getGene(idxClosest), numIntegersGene);
+                      &genes[idxClosest * numIntegersGene], numIntegersGene);
         TSP.setFitness(idxClosest, immigrantFitnesses[immigrantIdx]);
     }
     
@@ -376,15 +412,14 @@ int Island::computeSendBufferSize() { // TODO: could be implemented in a more fu
 }
 
 
-// TODO: could be implemented in a more functional way
-int Island::computeReceiveBufferSize(int sendBufferSize) { // TODO: currently adjusted to MPI_Allgather fix this
+int Island::computeReceiveBufferSize(int sendBufferSize) { // TODO: could be implemented in a more functional way
     
     switch (MIGRATION_TOPOLOGY) {
             
         case MigrationTopology::FULLY_CONNECTED: {
             
-            // number of senders MPI_Allgather
-            return sendBufferSize * numIndividualsIsland;
+            // sizeCommWorld is total number of ranks using MPI_Allgather
+            return sendBufferSize * sizeCommWorld;
             break;
         }
             
@@ -432,7 +467,7 @@ void Island::fillSendBuffers() { // TODO: could be implemented in a more functio
             
         case SelectionPolicy::TOURNAMENT_SELECTION: {
             
-            tournamentSelection(3, migrants, numIndividualsSendBuffer); // TODO: allow for tournament size as a parameter
+            tournamentSelection(migrants, numIndividualsSendBuffer);
             break;
         }
             
@@ -448,8 +483,8 @@ void Island::fillSendBuffers() { // TODO: could be implemented in a more functio
     for(int migrantIdx = 0; migrantIdx < numIndividualsSendBuffer; migrantIdx++) {
         
         // simply copy array
-        overwriteGene(TSP.getGene(migrants[migrantIdx]),
-                      &sendBufferGenes[migrantIdx * numIntegersGene], numIntegersGene); // TODO: fix access
+        overwriteGene(&genes[migrants[migrantIdx] * numIntegersGene],
+                      &sendBufferGenes[migrantIdx * numIntegersGene], numIntegersGene);
     }
     
     for(int migrantIdx = 0; migrantIdx < numIndividualsSendBuffer; migrantIdx++) {
@@ -480,7 +515,7 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
         case MigrationTopology::ISOLATED: {
             
             int status = MPI_Barrier(MPI_COMM_WORLD); // Synchronize islands
-            // could check status == MPI_SUCCESS
+            assert(status == MPI_SUCCESS);
             break;
         }
         
@@ -498,13 +533,13 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
                                       destRankID, FITNESS_TAG,
                                       receiveBufferFitness, numIndividualsReceiveBuffer, MPI_DOUBLE,
                                       rankID, FITNESS_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            // could check status == MPI_SUCCESS
+            assert(status == MPI_SUCCESS);
             
             status = MPI_Sendrecv(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
                                   destRankID, GENE_TAG,
                                   receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, MPI_INT,
                                   rankID, GENE_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            // could check status == MPI_SUCCESS
+            assert(status == MPI_SUCCESS);
             
             break;
         }
@@ -514,11 +549,9 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
 }
 
 
-void Island::emptyReceiveBuffers() {
+void Island::emptyReceiveBuffers() { // TODO: maybe use a function pointer which is set inside the constructor
     
-    switch(REPLACEMENT_POLICY) { // TODO: remove some parameters and access these values from object variables instead
-            // TODO: fix crowding replacement parameter
-            // TODO: maybe use a object variable function pointer which is set inside the constructor
+    switch(REPLACEMENT_POLICY) {
             
         case ReplacementPolicy::TRUNCATION:
             
@@ -532,7 +565,7 @@ void Island::emptyReceiveBuffers() {
             
         case ReplacementPolicy::DEJONG_CROWDING:
             
-            crowdingReplacement(3, numIndividualsReceiveBuffer, receiveBufferGenes, receiveBufferFitness);
+            crowdingReplacement(numIndividualsReceiveBuffer, receiveBufferGenes, receiveBufferFitness);
             break;
             
     } // end switch case
@@ -542,133 +575,28 @@ void Island::emptyReceiveBuffers() {
 
 double Island::solve(const int numEvolutions) {
     
-    /*// For MPI_Allgather and to compute how much data is received
-    int rank, numProcesses;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
+    int numPeriods = numEvolutions / MIGRATION_PERIOD;
+        
+    for(int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
+        
+        // Run the GA for MIGRATION_PERIOD iterations
+        TSP.solve(MIGRATION_PERIOD, rankID);
+        
+        // MPI part (Migration part)
+        fillSendBuffers();
+        
+        doSynchronousBlockingCommunication();
+        
+        emptyReceiveBuffers();
+        
+    }
     
-    // Local helper variables for convenience
-    int numNodes = (this->tsp)->problem_size;
-    int numIntsGene = numNodes;
-    int migrationAmount = this->migrationAmount;
-    int numIndivsIsland = (this->tsp)->population_count;
+    if (numEvolutions % MIGRATION_PERIOD != 0) {
         
+        TSP.solve(numEvolutions % MIGRATION_PERIOD, rankID);
+    }
     
-    for(int currPeriod = 0; currPeriod < this->numPeriods; currPeriod++) {
-        
-        // Run the GA for migrationPeriod iterations
-        (this->tsp)->solve(this->migrationPeriod, rank);
-        
-        
-        // Set up buffers for sending data
-        double sendBufferFitness[migrationAmount];
-        int sendBufferGenes[migrationAmount * numIntsGene];
-        
-        
-        int* ranks = (this->tsp)->getRanks();
-        
-        for(int indivIdx = 0; indivIdx < migrationAmount; indivIdx++) {
-            
-            sendBufferFitness[indivIdx] = (this->tsp)->getFitness(ranks[indivIdx]);
-            
-            
-            int* gene = (this->tsp)->getGene(ranks[indivIdx]);
-            
-            for(int nodeIdx = 0; nodeIdx < numNodes; nodeIdx++) {
-                sendBufferGenes[(indivIdx * numNodes) + nodeIdx] = gene[nodeIdx];
-            }
-            
-        }
-        
-        
-        // Set up buffers for receiving data
-        double receiveBufferFitness[migrationAmount * numProcesses];
-        int receiveBufferGenes[migrationAmount * numNodes * numProcesses];
-        
-        
-        // "Gathers data from all tasks and distribute the combined data to all tasks"
-        // - I suppose this is synchronized
-        // - amount of data sent == amount of data received from any process
-        MPI_Allgather(sendBufferFitness, migrationAmount, MPI_DOUBLE,
-                      receiveBufferFitness, migrationAmount, MPI_DOUBLE, MPI_COMM_WORLD);
-        
-        MPI_Allgather(sendBufferGenes, migrationAmount * numNodes, MPI_INT,
-                      receiveBufferGenes, migrationAmount * numNodes, MPI_INT, MPI_COMM_WORLD);
-        
-        
-        // Assemble result
-        // - there is some redundancy as each process is receiving its own data
-        // - this is an attempt to solve this more or less efficiently
-        
-        // Use (idx, fitness) pairs to facilitate sorting
-        Individual incomingIndividuals[migrationAmount * (numProcesses - 1)];
-        
-        int helperIdx = 0;
-        
-        for(int indivIdx = 0; indivIdx < migrationAmount * numProcesses; indivIdx++) {
-            
-            if(indivIdx < rank * migrationAmount || (rank + 1) * migrationAmount <= indivIdx) {
-            
-                (incomingIndividuals[helperIdx]).idx = indivIdx;
-                (incomingIndividuals[helperIdx]).fitness = receiveBufferFitness[indivIdx];
-            
-                helperIdx++;
-            }
-            
-        }
-        
-        // Sort the incoming data in ascending order
-        // (the data at the current island is already sorted)
-        sort(incomingIndividuals, incomingIndividuals + (migrationAmount * (numProcesses - 1)));
-        
-        // Determine how many individuals are going to be replaced
-        int numReplaced = 0;
-        
-        int idxIncoming = 0;
-        
-        int offsetIsland = numIndivsIsland - (migrationAmount * (numProcesses - 1));
-        int idxIsland = 0;
-        
-        while(idxIncoming < migrationAmount * (numProcesses - 1)
-              && idxIsland < migrationAmount * (numProcesses - 1)) {
-            
-            double currFitnessIncoming = (incomingIndividuals[idxIncoming]).fitness;
-            double currFitnessIsland = (this->tsp)->getFitness(ranks[offsetIsland + idxIsland]);
-            
-            if(currFitnessIncoming < currFitnessIsland) { // incoming individual is better
-                
-                numReplaced++;
-                
-                idxIncoming++;
-                idxIsland++;
-                
-            } else { // island individual is better
-                
-                idxIsland++;
-            }
-        }
-        
-        // Just throw out the numReplaced weakest individuals of the island by replacing their gene
-        // - the fitness is updated too
-        // - the ranks stored in the TSP object are no longer correct after this step
-        for(int indivIdx = 0; indivIdx < numReplaced; indivIdx++) {
-            
-            int* currGene = (this->tsp)->getGene(ranks[(numIndivsIsland - 1) - indivIdx]); // TODO: indexing for ranks seems to be wrong
-            int* newGene = &receiveBufferGenes[incomingIndividuals[indivIdx].idx * numNodes];
-            
-            copyArray(newGene, currGene, numNodes);
-            
-            (this->tsp)->setFitness(ranks[(numIndivsIsland - 1) - indivIdx],
-                                   incomingIndividuals[indivIdx].fitness);
-        }
-        
-    } // end numPeriods
-        
-    double bestLocalFitness;
-    bestLocalFitness = (this->tsp)->getMinFitness();
+    return TSP.getMinFitness();
     
-    return bestLocalFitness;*/
-    
-    return 0;
 }
 

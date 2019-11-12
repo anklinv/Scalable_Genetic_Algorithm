@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <iostream> // for debugging
 #include <limits>
+#include <cassert> // for debugging
 
 #include "../sequential/travelling_salesman_problem.hpp"
 
@@ -52,17 +53,18 @@ public:
     /// with the same settings (i.e. run the same code).
     ///
     /// \param TSP a fully initialized TSP
-    Island(TravellingSalesmanProblem TSP,
+    Island(TravellingSalesmanProblem& TSP,
            const MigrationTopology mt, const int numIndivsReceivedPerMigration, const int migrationPeriod,
            const SelectionPolicy sp, const ReplacementPolicy rp);
+    ~Island();
     
 
     /// Executes the GA on the current rank. Because of MPI_Allgather it is necessary that all ranks in MPI_COMM_WORLD
     /// execute the GA simultaneously.
     ///
-    /// \param numEvolutions the number of evolution steps for the algorithm to run
+    /// \param NUM_EVOLUTIONS the number of evolution steps for the algorithm to run
     /// \return the length of the shortest path found by the algorithm
-    double solve(const int numEvolutions);
+    double solve(const int NUM_EVOLUTIONS);
     
     
 private:
@@ -81,7 +83,7 @@ private:
     
     
     /// Use a pointer to avoid dealing with object initialization
-    TravellingSalesmanProblem TSP;
+    TravellingSalesmanProblem& TSP;
  
     
     /// Migration topology (connections between Islands)
@@ -110,29 +112,38 @@ private:
     int rankID;
     
 
-    // For convenience as this is used a lot
+    /// For convenience as this is used a lot
     int numIntegersGene;
     
-    // For convenience as this is used a lot
+    /// For convenience as this is used a lot
     int numIndividualsIsland;
     
+    /// For convenience as this is used a lot
+    int* ranks;
     
-    // Number of individuals sent to the network during a migration step
+    /// For convenience as this is used a lot
+    int* genes;
+    
+    
+    /// Number of individuals sent to the network during a migration step
     int numIndividualsSendBuffer;
     
-    // Number of individuals received from the network during a migration step
+    /// Number of individuals received from the network during a migration step
     int numIndividualsReceiveBuffer;
     
 
-    // TODO: allocate these inside constructor (->heap? check this)
-    // TODO: deallocate these inside destructor
+    /// Send buffer for gene data
     int* sendBufferGenes;
     
+    /// Send buffer for fitness data
     double* sendBufferFitness;
     
+    /// Receive buffer for gene data
     int* receiveBufferGenes;
     
+    /// Receive buffer for fitness data
     double* receiveBufferFitness;
+    
     
     /// Empties the receive buffers and integrates the data into the current Island data according to the REPLACEMENT_POLICY.
     void emptyReceiveBuffers();
@@ -144,14 +155,14 @@ private:
     /// Uses the SELECTION_POLICY to fill sendBufferFitnesses and sendBufferGenes with data.
     void fillSendBuffers();
     
-    /// Computes the size of the send buffer. The size of the send buffer depends on MIGRATION_TOPOLOGY and
-    /// NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION. Called once in the constructor.
+    /// Computes the size of the send buffer (i.e. the number of individuals to send). The size of the send buffer depends on
+    /// MIGRATION_TOPOLOGY and NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION. Called once in the constructor.
     int computeSendBufferSize();
     
-    /// Computes the size of the receive buffer. The size of the receive buffer differs from NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION
-    /// because of the internal use of MPI_Allgather and the case where the immigrants cannot be evenly distributed among
-    /// senders. Called once in the constructor.
-    int computeReceiveBufferSize(int sendBufferSize); // TODO: sendBufferSize could be accessed via object variable
+    /// Computes the size of the receive buffer (i.e. the number of individuals to receive). The size of the receive buffer differs
+    /// from NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION because of the internal use of MPI_Allgather and the case where
+    /// the immigrants cannot be evenly distributed among senders. Called once in the constructor.
+    int computeReceiveBufferSize(int sendBufferSize);
     
     /// Replaces the geneSize entries of oldGene with the geneSize entries of newGene. This corresponds to replacing
     /// an individual (essentially a gene and a fitness value based thereon) of a population with a new one.
@@ -178,13 +189,13 @@ private:
     void stochasticUniversalSampling(int* sampledIndividuals, int numIndividualsToSample);
     
     /// Does tournament selection. Returns the indices of numIndividualsToSample selected individuals as array. For each
-    /// individual to be selected, tournamentSize individuals are sampled uniformly at random and the best individual thereof
-    /// is selected. Standard values for tournamentSize are 2 or 3.
-    void tournamentSelection(int tournamentSize, int* sampledIndividuals, int numIndividualsToSample);
+    /// individual to be selected, 3 individuals are sampled uniformly at random and the best individual thereof is selected.
+    void tournamentSelection(int* sampledIndividuals, int numIndividualsToSample);
     
-    /// Returns the indices of the numIndividualsToSample best individuals as an array. The fitness values are assumed to be sorted in
-    /// ascending order. Lower fitness is assumed to be better.
-    void truncationSelection(int* sampledIndividuals, int numIndividualsToSample); // TODO: add access to the ranks
+    /// Returns the indices of the numIndividualsToSample best individuals as an array. The ranks are assumed to be sorted
+    /// in ascending orders (i.e. the individual with the lowest fitness value is at the beginning and so on). Lower fitness is assumed
+    /// to be better.
+    void truncationSelection(int* sampledIndividuals, int numIndividualsToSample);
     
     /// Returns the indices of numIndividualsToSample randomly chosen individuals. The individuals are sampled uniformly at random.
     /// A specific individual can be selected multiple times.
@@ -202,7 +213,7 @@ private:
     /// Uses crowding for replacement. For each immigrant, crowdSize individuals are sampled uniformly at random
     /// and their Hamming Distance to the immigrant is computed. The individual which has the smallest Hamming
     /// Distance to the immigrant is replaced. It is possible that an immigrant is itself replaced by a subsequent one.
-    void crowdingReplacement(int crowdSize, int numImmigrants, int* immigrantGenes, double* immigrantFitnesses);
+    void crowdingReplacement(int numImmigrants, int* immigrantGenes, double* immigrantFitnesses);
     
 };
 
