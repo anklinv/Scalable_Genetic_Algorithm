@@ -1,0 +1,33 @@
+{
+  "name" : "compare naive to island",
+  "fixed_params" : {
+    "-n" : 8,
+    "--population": 1000,
+    "--elite_size": 16,
+    "--mutation": 16,
+    "--epochs": 50000,
+    "--migration_period": 200,
+    "--num_migrations": 250,
+    "--migration_amount": 5
+  },
+  "variable_params" : {
+    "--data": {
+      "type": "list",
+      "list": [
+        "a280.csv",
+        "att532.csv",
+        "bier127.csv",
+        "ch130.csv",
+        "d493.csv",
+        "d1291.csv"
+      ]
+    },
+    "mode": {
+      "type": "list",
+      "list": [
+        "island",
+        "sequential"
+      ]
+    }
+  }
+}
