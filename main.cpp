@@ -25,7 +25,7 @@ int nr_epochs = 5000;
 int nr_individuals = 100;
 
 // island or sequential
-bool runIsland = false;
+bool runIsland = true;
 
 string data_dir = "data";
 
@@ -306,14 +306,12 @@ int main(int argc, char** argv) {
 
     // ISLAND MODEL
     } else if (runIsland) {
-
-        // 1000 epochs is def
         
-        Island island(problem, Island::MigrationTopology::ISOLATED, 5, 200,
-                      Island::SelectionPolicy::PURE_RANDOM,
+        Island island(problem, Island::MigrationTopology::FULLY_CONNECTED, 4, 200, // immigrants RECEIVED per migration, migration period
+                      Island::SelectionPolicy::TOURNAMENT_SELECTION,
                       Island::ReplacementPolicy::PURE_RANDOM);
         
-        double bestDistance = island.solve(1000);
+        double bestDistance = island.solve(1000); // number of evolution steps
         
         cout << bestDistance << endl;
       

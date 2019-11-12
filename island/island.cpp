@@ -18,9 +18,9 @@ REPLACEMENT_POLICY(rp) { // initializer list
     int status;
     
     status = MPI_Comm_rank(MPI_COMM_WORLD, &rankID);
-    assert(status == MPI_SUCCESS);
+    //assert(status == MPI_SUCCESS);
     MPI_Comm_size(MPI_COMM_WORLD, &sizeCommWorld);
-    assert(status == MPI_SUCCESS);
+    //assert(status == MPI_SUCCESS);
         
     
     // convenience variables
@@ -62,10 +62,10 @@ void Island::overwriteGene(int* newGene, int* oldGene, int geneSize) {
         oldGene[geneIdx] = newGene[geneIdx];
     }
     
-    for(int geneIdx = 0; geneIdx < geneSize; geneIdx++)
-        assert(oldGene[geneIdx] == newGene[geneIdx]);
+    //for(int geneIdx = 0; geneIdx < geneSize; geneIdx++)
+    //    assert(oldGene[geneIdx] == newGene[geneIdx]);
     
-    assert(newGene + geneSize - 1 < oldGene || oldGene + geneSize - 1 < newGene);
+    //assert(newGene + geneSize - 1 < oldGene || oldGene + geneSize - 1 < newGene);
 }
 
 
@@ -77,13 +77,13 @@ int Island::computeHammingDistance(int* firstGene, int* scndGene, int geneSize) 
     while(firstGene[idxFirst] != 1) { // firstGene[idxFirst] == 1
         idxFirst++;
     }
-    assert(0 <= idxFirst && idxFirst < geneSize && firstGene[idxFirst] == 1);
+    //assert(0 <= idxFirst && idxFirst < geneSize && firstGene[idxFirst] == 1);
     
     int idxScnd = 0;
     while(scndGene[idxScnd] != 1) { // scndGene[idxScnd] == 1
         idxScnd++;
     }
-    assert(0 <= idxScnd && idxScnd < geneSize && scndGene[idxScnd] == 1);
+    //assert(0 <= idxScnd && idxScnd < geneSize && scndGene[idxScnd] == 1);
     
     for(int geneIdx = 0; geneIdx < geneSize; geneIdx++) {
         
@@ -243,18 +243,18 @@ void Island::stochasticUniversalSampling(int* sampledIndividuals, int numIndivid
 
 void Island::truncationSelection(int* sampledIndividuals, int numIndividualsToSample) {
     
-    double lastFitness = -1;
-    double currFitness = -1;
+    //double lastFitness = -1;
+    //double currFitness = -1;
     
     for(int indivIdx = 0; indivIdx < numIndividualsToSample; indivIdx++) {
      
         sampledIndividuals[indivIdx] = ranks[indivIdx];
         
-        currFitness = TSP.getFitness(ranks[indivIdx]);
-        if (indivIdx != 0) {
-            assert(lastFitness <= currFitness);
-        }
-        lastFitness = currFitness;
+        //currFitness = TSP.getFitness(ranks[indivIdx]);
+        //if (indivIdx != 0) {
+        //    assert(lastFitness <= currFitness);
+        //}
+        //lastFitness = currFitness;
     }
     
 }
@@ -515,7 +515,7 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
         case MigrationTopology::ISOLATED: {
             
             int status = MPI_Barrier(MPI_COMM_WORLD); // Synchronize islands
-            assert(status == MPI_SUCCESS);
+            //assert(status == MPI_SUCCESS);
             break;
         }
         
@@ -525,22 +525,26 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
             
             int destRankID = (rankID + 1) % sizeCommWorld;
             
+            int srcRankID = rankID - 1;
+            if(srcRankID < 0) {
+                srcRankID = sizeCommWorld - 1;
+            }
+            
             const int FITNESS_TAG = 0x01011;
             const int GENE_TAG = 0x01100;
-            
             
             int status = MPI_Sendrecv(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
                                       destRankID, FITNESS_TAG,
                                       receiveBufferFitness, numIndividualsReceiveBuffer, MPI_DOUBLE,
-                                      rankID, FITNESS_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            assert(status == MPI_SUCCESS);
+                                      srcRankID, FITNESS_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            //assert(status == MPI_SUCCESS);
             
             status = MPI_Sendrecv(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
                                   destRankID, GENE_TAG,
                                   receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, MPI_INT,
-                                  rankID, GENE_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            assert(status == MPI_SUCCESS);
-            
+                                  srcRankID, GENE_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            //assert(status == MPI_SUCCESS);
+                        
             break;
         }
         
