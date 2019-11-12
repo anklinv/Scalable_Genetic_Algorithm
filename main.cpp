@@ -308,12 +308,15 @@ int main(int argc, char** argv) {
     } else if (runIsland) {
 
         // 1000 epochs is def
-        Island island(&problem, migration_period, migration_amount, num_migrations); // period, amount, numPeriods
-        double bestDistance = island.solve();
-
-        if(rank == 0) {
-            cout << "Best final distance overall is " << bestDistance << endl;
-        }
+        
+        Island island(problem, Island::MigrationTopology::ISOLATED, 5, 200,
+                      Island::SelectionPolicy::PURE_RANDOM,
+                      Island::ReplacementPolicy::PURE_RANDOM);
+        
+        double bestDistance = island.solve(1000);
+        
+        cout << bestDistance << endl;
+      
     } // end runIsland
 
     // Delete cities matrix
