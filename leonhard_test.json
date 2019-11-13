@@ -1,17 +1,20 @@
 {
   "name" : "leonhard test",
-  "repetitions" : 3,
+  "repetitions" : 1,
   "fixed_params" : {
     "-n" : 8,
-    "--population": 1000,
+    "--population": 100,
     "--elite_size": 16,
     "--mutation": 16,
-    "--epochs": 50000,
+    "--epochs": 500,
     "--migration_period" : 200,
     "--num_migrations" : 250,
     "--migration_amount" : 5,
-    "--data" : "a280.csv",
-    "mode" : "sequential"
+    "--data" : "att48.csv",
+    "mode" : "sequential", 
+    "--migration_topology" : "ring",
+    "--selection_policy" : "pure_random",
+    "--replacement_policy" : "pure_random"
   },
   "variable_params" : {
   }

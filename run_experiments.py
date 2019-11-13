@@ -78,7 +78,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.dry_run:
-        print("Compiling... ", end="")
+        print("Compiling... ")
         os.system("cmake .")
         os.system("make")
         print("Done!")
