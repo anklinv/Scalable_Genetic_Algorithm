@@ -143,7 +143,7 @@ if __name__ == "__main__":
                 program_params += " "
 
             for repetition in range(repetitions):
-                job_string = "_".join(job).replace(".", "").replace("-", "")
+                job_string = "_".join(job).replace(".", "").replace("-", "") if len(job) > 0 else "novar"
                 job_string += "_" + str(repetition)
 
                 repetition_logging_location = os.path.join(experiment_dir, job_string, "")
@@ -163,8 +163,7 @@ if __name__ == "__main__":
                 while not success:
                     if no_job_running(args.dry_run):
                         success = True
-                        job_name = "leonhard"
-                        log_dir = os.path.join(experiment_dir, repetition_logging_location)
+                        log_dir = os.path.join(repetition_logging_location, "leonhard")
                         submit_job(log_name=log_dir, n=n, program_params=rep_program_params, dry_run=args.dry_run)
 
                         # Wait to make sure submitted job is visible
