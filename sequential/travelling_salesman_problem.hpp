@@ -88,9 +88,9 @@ private:
     int log_iter_freq;
 
     /// Calculate the fitness of an individual, which is the length of the closed path in the graph and return it.
-    /// \param individual pointer to an array of size problem_size
+    /// \param index of individual
     /// \return the length of the path in the graph
-    double evaluate_fitness(const int individual);
+    double evaluate_fitness(int individual);
 
     /// Run a single iteration of selection, breeding and mutation
     void evolve(int rank);
@@ -101,17 +101,17 @@ private:
 
     /// Breed two individuals into a new one. Take a random sequence of parent1 and merge the remaining path from parent2
     /// while making sure that there is nothing that repeats.
-    /// \param parent1 mother of the child
-    /// \param parent2 father of the child
+    /// \param parent1 index of mother of the child
+    /// \param parent2 index of father of the child
     /// \param child mix of mother and father
-    void breed(int *parent1, int *parent2, int* child);
+    void breed(int parent1, int parent2, int* child);
 
     /// Apply breeding to the whole population by taking random individuals and breeding them. Make sure that all elite
     /// members stay unchanged.
     void breed_population();
 
     /// Mutate a single individual by randomly flipping some cities in the path
-    /// \param individual an array of size this->problem_size
+    /// \param index to an individual
     void mutate(int individual);
 
     /// Apply mutation to the whole population

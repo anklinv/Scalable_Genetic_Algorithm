@@ -198,7 +198,7 @@ double TravellingSalesmanProblem::evaluate_fitness(const int individual) {
 //possible solutions:
 //  * take 50% of each parent as opposed to randomly taking a sequence
 //  *
-void TravellingSalesmanProblem::breed(int *parent1, int *parent2, int* child) {
+void TravellingSalesmanProblem::breed(const int parent1, const int parent2, int* child) {
     //selecting gene sequences to be carried over to child
     int geneA = this->rand_range(0, this->problem_size - 1);
     int geneB = this->rand_range(0, this->problem_size - 1);
@@ -207,18 +207,20 @@ void TravellingSalesmanProblem::breed(int *parent1, int *parent2, int* child) {
 
     set<int> selected;
     for (int i = startGene; i <= endGene; ++i) {
-        child[i] = parent1[i];
-        selected.insert(parent1[i]);
+        VAL_POP(parent1, i);
+        child[i] = POP(parent1, i);
+        selected.insert(POP(parent1, i));
     }
 
     int index = 0;
     for (int i = 0; i < this->problem_size; ++i) {
         // If not already chosen that city
-        if (selected.find(parent2[i]) == selected.end()) {
+        VAL_POP(parent2, i);
+        if (selected.find(POP(parent2, i)) == selected.end()) {
             if (index == startGene) {
                 index = endGene + 1;
             }
-            child[index] = parent2[i];
+            child[index] = POP(parent2, i);
             index++;
         }
     }
@@ -243,18 +245,9 @@ void TravellingSalesmanProblem::breed_population() {
 
     // Breed any random individuals
     for (int i = this->elite_size; i < this->population_count; ++i) {
-	int rand1 = dist(gen);
-	int rand2 = dist(gen);
-	int* parent1;
-	int* parent2;
-
-	parent1 = this->getGene(rand1);
-	parent2 = this->getGene(rand2);
-        this->breed(
-                parent1,
-                parent2,
-                temp_population[i]);
-
+        int rand1 = dist(gen);
+        int rand2 = dist(gen);
+        this->breed(rand1, rand2, temp_population[i]);
     }
 
     for (int i = 0; i < this->population_count; ++i) {
@@ -265,7 +258,7 @@ void TravellingSalesmanProblem::breed_population() {
     }
 }
 
-void TravellingSalesmanProblem::mutate(int individual) {
+void TravellingSalesmanProblem::mutate(const int individual) {
     if (rand() % this->mutation_rate == 0) {
         int swap = rand_range(0, this->problem_size - 1);
         int swap_with = rand_range(0, this->problem_size - 1);
@@ -321,13 +314,3 @@ void TravellingSalesmanProblem::setFitness(int indivIdx, double newFitness) { //
 double TravellingSalesmanProblem::getMinFitness() { // for Island
     return *min_element(fitness.begin(), fitness.end());
 }
-
-int* TravellingSalesmanProblem::getGene(int indivIdx) {
-    int* pop = new int[this->problem_size];
-    for (int j = 0; j < this->problem_size; ++j){
-        VAL_POP(indivIdx, j);
-	    pop[j] = POP(indivIdx, j);
-    } 
-    return pop;
-}
-
