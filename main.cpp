@@ -19,18 +19,18 @@ using namespace std;
 // Global variables (parameters)
 
 // --epochs
-int nr_epochs = 5000;
+int nr_epochs = 50000;
 
 // --population
-int nr_individuals = 100;
+int nr_individuals = 1000;
 
 // island or sequential
-bool runIsland = true;
+bool runIsland = false;
 
 string data_dir = "data";
 
 // --data
-string data_file = "ch130.csv";
+string data_file = "a280.csv";
 
 // --log_dir
 string log_dir = "logs/";
@@ -42,13 +42,16 @@ int migration_period = 200;
 int migration_amount = 5;
 
 // --num_migrations
-int num_migrations = 5;
+int num_migrations = 250;
 
 // --elite_size
-int elite_size = 8;
+int elite_size = 16;
 
 // --mutation
 int mutation = 16;
+
+// --verbose
+int verbose = 0;
 
 
 // typedefs
@@ -63,7 +66,7 @@ inline bool file_exists(const std::string& name) {
     return f.good();
 }
 
-void parse_args(int argc, char** argv, bool verbose=true) {
+void parse_args(int argc, char** argv, bool verbose=false) {
     if (verbose) {
         cout << "Found " << argc - 1 << " arguments." << endl;
     }
@@ -176,6 +179,17 @@ void parse_args(int argc, char** argv, bool verbose=true) {
             if (verbose) {
                 cout << "Mutation:\t" << argv[i+1] << endl;
             }
+        } else if (argv[i] == (string) "--verbose") {
+            assert(i + 1 < argc);
+            try {
+                verbose = stoi(argv[i+1]);
+            } catch (const std::invalid_argument &e) {
+                cerr << "Invalid integer for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose) {
+                cout << "Verbose:\t" << argv[i+1] << endl;
+            }
         }
     }
 }
@@ -208,7 +222,6 @@ void read_input(int &num_cities, float*& cities_matrix) {
     string dim;
     getline(input, dim);
     num_cities = stoi(dim);
-    cout << "number of cities: " << num_cities << endl;
     cities_matrix = new float[num_cities * num_cities];
     // Read values
     for (int i = 0; i < num_cities; ++i) {
@@ -261,17 +274,22 @@ int main(int argc, char** argv) {
     assert(number_cities != -1);
 
     // Create problem
-    TravellingSalesmanProblem problem(number_cities, node_edge_mat, nr_individuals, elite_size, mutation);
+    TravellingSalesmanProblem problem(number_cities, node_edge_mat, nr_individuals, elite_size, mutation, verbose);
     problem.set_logger(new Logger(log_dir, rank));
 
     // NAIVE PARALLEL MODEL
     if (not runIsland) {
         auto start = chrono::high_resolution_clock::now();
         double final_distance = problem.solve(nr_epochs, rank);
-        cout << "Final distance is " << final_distance << " (rank " << rank << ")" << endl;
+        if (verbose > 0) {
+            cout << "Final distance is " << final_distance << " (rank " << rank << ")" << endl;
+        }
+
         auto stop = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
-        cout << duration.count() << " ms total runtime (rank " << rank << ")" << endl;
+        if (verbose > 0) {
+            cout << duration.count() << " ms total runtime (rank " << rank << ")" << endl;
+        }
 
         if (rank != 0) {
 
@@ -300,8 +318,10 @@ int main(int argc, char** argv) {
             double mean = computeMean(all_dists);
             double stddev = computeStdDev(all_dists);
 
-            cout << "Best final distance overall is " << final_distance << endl;
-            cout << "(mean is " << mean << ", std dev is " << stddev << ")" << endl;
+            if (verbose > 0) {
+                cout << "Best final distance overall is " << final_distance << endl;
+                cout << "(mean is " << mean << ", std dev is " << stddev << ")" << endl;
+            }
         }
 
     // ISLAND MODEL
@@ -312,8 +332,9 @@ int main(int argc, char** argv) {
                       Island::ReplacementPolicy::PURE_RANDOM);
         
         double bestDistance = island.solve(1000); // number of evolution steps
-        
-        cout << bestDistance << endl;
+        if (verbose > 0) {
+            cout << bestDistance << endl;
+        }
       
     } // end runIsland
 

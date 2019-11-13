@@ -20,8 +20,11 @@ public:
     /// \param population_count size of the population
     /// \param elite_size number of individuals that survive for sure
     /// \param mutation_rate 1/mutation_rate is the probability that an individual gets a mutation
-    TravellingSalesmanProblem(int problem_size, float* cities, int population_count, int elite_size, int mutation_rate);
+    TravellingSalesmanProblem(int problem_size, float* cities, int population_count, int elite_size, int mutation_rate, int verbose);
     ~TravellingSalesmanProblem();
+
+    /// For debug printing
+    int verbose;
 
     /// Number of nodes in the graph
     int problem_size;

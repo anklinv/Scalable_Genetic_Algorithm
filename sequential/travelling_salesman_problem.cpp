@@ -27,7 +27,8 @@ bool log_all_values = false;
 bool log_best_value = true;
 
 TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, float* cities,
-        const int population_count, const int elite_size, const int mutation_rate) {
+        const int population_count, const int elite_size, const int mutation_rate, const int verbose) {
+    this->verbose = verbose;
     this->problem_size = problem_size;
     this->population_count = population_count;
     this->elite_size = elite_size;
@@ -123,8 +124,10 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
 #endif*/
 
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
-        if (epoch % this->log_iter_freq == 0) {
-            cout << epoch << " of " << nr_epochs << endl;
+        if (this->verbose > 0) {
+            if (epoch % this->log_iter_freq == 0) {
+                cout << epoch << " of " << nr_epochs << endl;
+            }
         }
         // auto start = chrono::high_resolution_clock::now();
         this->evolve(rank);
