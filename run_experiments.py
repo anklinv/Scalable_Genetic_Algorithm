@@ -55,7 +55,7 @@ def find_param(name, var_names, var_vals, fixed_params, default_params):
     if name in default_params:
         return default_params[name]
 
-    print("Coult not find parameter {} anywhere!".format(name))
+    print("Could not find parameter {} anywhere!".format(name))
     exit(1)
 
 
