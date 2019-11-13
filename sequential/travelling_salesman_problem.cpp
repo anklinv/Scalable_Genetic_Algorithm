@@ -48,6 +48,8 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, flo
 
     // TODO: make this nicer
     this->population = new int[population_count * problem_size];
+    
+    this->evolutionCounter = 0;
 
     // Randomly initialize the populations
     vector<int> tmp_indices(problem_size);
@@ -65,11 +67,13 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, flo
 }
 
 TravellingSalesmanProblem::~TravellingSalesmanProblem() {
+    this->logger->close();
     delete this->logger;
 }
 
 void TravellingSalesmanProblem::set_logger(Logger *_logger) {
     this->logger = _logger;
+    this->logger->open();
 }
 
 void TravellingSalesmanProblem::evolve(const int rank) {
@@ -111,7 +115,6 @@ void TravellingSalesmanProblem::evolve(const int rank) {
 }
 
 double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
-    this->logger->open();
 
 /*#ifdef debug
     this->rank_individuals();
@@ -133,9 +136,9 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
         this->evolve(rank);
 
         if (log_all_values) {
-            this->logger->log_all_fitness_per_epoch(epoch, this->fitness);
+            this->logger->log_all_fitness_per_epoch(this->evolutionCounter, this->fitness);
         } else if (log_best_value) {
-            this->logger->log_best_fitness_per_epoch(epoch, this->fitness_best);
+            this->logger->log_best_fitness_per_epoch(this->evolutionCounter, this->fitness_best);
         }
 
 #ifdef debug
@@ -149,6 +152,9 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
             // cout << endl;
         }
 #endif
+        
+        this->evolutionCounter = this->evolutionCounter + 1;
+        
         // auto stop = chrono::high_resolution_clock::now();
         // auto duration = chrono::duration_cast<chrono::microseconds>(stop - start);
         // cout << "\t" << duration.count() << " us epoch runtime (epoch " << epoch << " rank " << rank << ")" << endl;
@@ -156,12 +162,11 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
 
     this->rank_individuals();
     if (log_all_values) {
-        this->logger->log_all_fitness_per_epoch(nr_epochs, this->fitness);
+        this->logger->log_all_fitness_per_epoch(this->evolutionCounter, this->fitness);
     } else if (log_best_value) {
-        this->logger->log_best_fitness_per_epoch(nr_epochs, this->fitness_best);
+        this->logger->log_best_fitness_per_epoch(this->evolutionCounter, this->fitness_best);
     }
 
-    this->logger->close();
     return this->fitness_best;
 }
 

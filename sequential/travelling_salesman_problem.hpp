@@ -89,6 +89,10 @@ private:
 
     /// How often to write
     int log_iter_freq;
+    
+    /// A counter to count the number of evolution steps done since object creation. This is necessary because
+    /// an Island calls solve() multiple times.
+    int evolutionCounter;
 
     /// Calculate the fitness of an individual, which is the length of the closed path in the graph and return it.
     /// \param index of individual

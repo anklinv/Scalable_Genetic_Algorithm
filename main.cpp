@@ -57,7 +57,7 @@ Island::SelectionPolicy selection_policy = Island::SelectionPolicy::TOURNAMENT_S
 Island::ReplacementPolicy replacement_policy = Island::ReplacementPolicy::TRUNCATION;
 
 // --verbose
-int verbose = 0;
+int verbose = 1;
 
 
 // typedefs
