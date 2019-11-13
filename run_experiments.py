@@ -77,6 +77,12 @@ if __name__ == "__main__":
                         help="Which experiment file to run")
     args = parser.parse_args()
 
+    if not args.dry_run:
+        print("Compiling... ", end="")
+        os.system("cmake .")
+        os.system("make")
+        print("Done!")
+
     print("Running {} consecutive experiment(s)".format(len(args.experiment)))
     for e, experiment in enumerate(args.experiment):
         print("*"*50)
