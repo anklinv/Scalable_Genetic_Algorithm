@@ -89,21 +89,23 @@ if __name__ == "__main__":
         experiments = json.load(experiment_file)
         experiment_file.close()
         experiment_name = experiments["name"]
-        print("Running Experiment {} from file {}".format(experiment_name, experiment))
+        repetitions = experiments["repetitions"]
+
+        print("Running Experiment {} from file {} with {} repetitions".format(experiment_name, experiment, repetitions))
 
         # Create folder
         experiment_name = create_filename(experiment_name)
-        logging_location = os.path.join("logs", experiment_name, "")
+        experiment_dir = os.path.join("logs", experiment_name, "")
         if args.dry_run:
-            print("This will create the folder {}".format(logging_location))
+            print("This will create the folder {}".format(experiment_dir))
         else:
-            if os.path.isdir(logging_location):
-                print("Folder {} already exists... exiting".format(logging_location))
+            if os.path.isdir(experiment_dir):
+                print("Folder {} already exists... exiting".format(experiment_dir))
                 exit(1)
             else:
-                print("Logging into folder {}".format(logging_location))
-                os.mkdir(logging_location)
-                copyfile(experiment, logging_location + experiment)
+                print("Logging into folder {}".format(experiment_dir))
+                os.mkdir(experiment_dir)
+                copyfile(experiment, experiment_dir + experiment)
 
         # Finished setup
         print("*"*50)
@@ -140,22 +142,35 @@ if __name__ == "__main__":
                 program_params += str(param)
                 program_params += " "
 
-            program_params += "--log_dir"
-            program_params += " "
-            program_params += logging_location
+            for repetition in range(repetitions):
+                job_string = "_".join(job).replace(".", "").replace("-", "")
+                job_string += "_" + str(repetition)
 
-            success = False
-            while not success:
-                if no_job_running(args.dry_run):
-                    success = True
-                    job_name = "job_" + str(job_num)
-                    log_dir = os.path.join(logging_location, job_name)
-                    submit_job(log_name=log_dir, n=n, program_params=program_params, dry_run=args.dry_run)
+                repetition_logging_location = os.path.join(experiment_dir, job_string, "")
+                if not args.dry_run:
+                    if os.path.isdir(repetition_logging_location):
+                        print("Folder {} already exists... exiting".format(experiment_dir))
+                        exit(1)
+                    else:
+                        os.mkdir(repetition_logging_location)
 
-                    # Wait to make sure submitted job is visible
-                    if not args.dry_run:
-                        time.sleep(1)
-                else:
-                    # Do not retry too much
-                    time.sleep(60)
+                rep_program_params = program_params
+                rep_program_params += "--log_dir"
+                rep_program_params += " "
+                rep_program_params += repetition_logging_location
+
+                success = False
+                while not success:
+                    if no_job_running(args.dry_run):
+                        success = True
+                        job_name = "leonhard"
+                        log_dir = os.path.join(experiment_dir, repetition_logging_location)
+                        submit_job(log_name=log_dir, n=n, program_params=rep_program_params, dry_run=args.dry_run)
+
+                        # Wait to make sure submitted job is visible
+                        if not args.dry_run:
+                            time.sleep(1)
+                    else:
+                        # Do not retry too much
+                        time.sleep(15)
 

@@ -82,6 +82,7 @@ When writing an experiment specification you need to follow this standard:
 ```
 {
   "name" : <EXPERIMENT_NAME>,
+  "repetitions" : <NR_REPETITIONS>,
   "fixed_params" : {
     <FIXED_PARAM_1_NAME> : <FIXED_PARAM_1_VALUE>,
     ...
@@ -95,6 +96,7 @@ When writing an experiment specification you need to follow this standard:
 }
 ```
 - <EXPERIMENT_NAME> is any identifier for the experiment. White spaces will be turned into underscores for the folder name
+- <NR_REPETITIONS> is the number of repetitions of the experiment
 - <FIXED_PARAM_i_NAME> is the string of the argument identifier that should be fixed in the experiment.
 - <FIXED_PARAM_i_VALUE> is the integer or string of the value.
 - <VAR_PARAM_j_NAME> is the string of the argument identifier that should be varied in the experiment.
@@ -121,10 +123,11 @@ When writing an experiment specification you need to follow this standard:
      ```
 
 ## Example JSON for experiment
-In this example we try different number of islands of different sizes. We try every combination of using an island of size k where `1 <= k < 4` and the population size p where `p ∈ {100, 200, 400, 800}`.
+In this example we try different number of islands of different sizes. We try every combination of using an island of size k where `1 <= k < 4` and the population size p where `p ∈ {100, 200, 400, 800}` for 10 repetitions.
 ```
 {
   "name" : "try scaling and population size",
+  "repetitions" : 10,
   "fixed_params" : {
     "mode" : "island"
   },

@@ -1,5 +1,6 @@
 {
   "name" : "compare naive to island",
+  "repetitions" : 10,
   "fixed_params" : {
     "-n" : 8,
     "--population": 1000,
