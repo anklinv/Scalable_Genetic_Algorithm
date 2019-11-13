@@ -17,6 +17,12 @@ Run the program:
 Note: you need to be in the ETH network! (use VPN)
 ```ssh <netz>@login.leonhard.ethz.ch```
 
+To copy your SSH key, in your command line use:
+
+`ssh-copy-id <NETHZ>@login.leonhard.ethz.ch` (Linux and OSX)
+
+`cat ~/.ssh/id_rsa.pub | ssh <NETHZ>@login.leonhard.ethz.ch "cat >> ~/.ssh/authorized_keys"` (Windows)
+
 #### Load Modules
 ```module load gcc/8.2.0```
 
@@ -32,9 +38,14 @@ echo "module load openmpi/4.0.1" >> .bashrc
 (if you ever need to remove it again, just open `.bashrc` and delete the last two lines again.
 
 #### Compile
-```mpiCC main.cpp sequential/travelling_salesman_problem.cpp logging/logging.cpp```
+```
+cmake .
+make
+```
+
 #### Test if it works
 Do not do this exessively as it runs on the login node. Just use for sanity check.
+
 ```mpirun -np 2 ./Distributed_Genetic_Algorithm```
 
 ## Running a single job on Leonhard
