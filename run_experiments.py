@@ -149,7 +149,7 @@ if __name__ == "__main__":
                 program_params += " "
 
             for repetition in range(repetitions):
-                job_string = "_".join(job).replace(".", "").replace("-", "") if len(job) > 0 else "novar"
+                job_string = "_".join(str(v) for v in job).replace(".", "").replace("-", "") if len(job) > 0 else "novar"
                 job_string += "_" + str(repetition)
 
                 repetition_logging_location = os.path.join(experiment_dir, job_string, "")

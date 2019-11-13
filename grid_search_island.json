@@ -32,10 +32,10 @@
     "--selection_policy": {
         "type": "list",
         "list": [
-            "tournament_selection"
+            "truncation"
         ]
     },
-    "--replacement_policy" {
+    "--replacement_policy": {
         "type": "list",
         "list": [
             "truncation"
