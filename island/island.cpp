@@ -387,6 +387,10 @@ int Island::computeSendBufferSize() { // TODO: could be implemented in a more fu
             
             int numSenders = sizeCommWorld - 1;
             
+            if (numSenders == 0) { // bug fix for mpiexed -np 1
+                return 0;
+            }
+            
             if (NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION % numSenders == 0) {
                 return max(1, NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION / numSenders);
             } else {
@@ -405,6 +409,10 @@ int Island::computeSendBufferSize() { // TODO: could be implemented in a more fu
             
             return NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION;
             break;
+        }
+            
+        default: {
+            return -1; // error
         }
             
     } // end switch case
@@ -433,6 +441,10 @@ int Island::computeReceiveBufferSize(int sendBufferSize) { // TODO: could be imp
             
             return sendBufferSize;
             break;
+        }
+            
+        default: {
+            return -1; // error
         }
             
     } // end switch case
