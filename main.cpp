@@ -304,7 +304,7 @@ void read_input(int &num_cities, float*& cities_matrix) {
 int main(int argc, char** argv) {
 
     // Parse arguments and save in global variables
-    parse_args(argc, argv);
+    parse_args(argc, argv, verbose);
 
     MPI_Init(&argc, &argv); /* requirement for MPI */
 
