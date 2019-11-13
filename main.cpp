@@ -35,20 +35,26 @@ string data_file = "a280.csv";
 // --log_dir
 string log_dir = "logs/";
 
+// --elite_size
+int elite_size = 16;
+
+// --mutation
+int mutation = 16;
+
 // --migration_period
 int migration_period = 200;
 
 // --migration_amount
 int migration_amount = 5;
 
-// --num_migrations
-int num_migrations = 250;
+// --migration_topology {isolated, ring, fully_connected}
+Island::MigrationTopology migration_topology = Island::MigrationTopology::FULLY_CONNECTED;
 
-// --elite_size
-int elite_size = 16;
+// --selection_policy {pure_random, truncation, fitness_proportionate_selection, stochastic_universal_sampling, tournament_selection}
+Island::SelectionPolicy selection_policy = Island::SelectionPolicy::TOURNAMENT_SELECTION;
 
-// --mutation
-int mutation = 16;
+// --replacement_policy {pure_random, truncation, dejong_crowding}
+Island::ReplacementPolicy replacement_policy = Island::ReplacementPolicy::PURE_RANDOM;
 
 // --verbose
 int verbose = 0;
@@ -66,20 +72,20 @@ inline bool file_exists(const std::string& name) {
     return f.good();
 }
 
-void parse_args(int argc, char** argv, bool verbose=false) {
-    if (verbose) {
+void parse_args(int argc, char** argv, bool verbose_args=false) {
+    if (verbose_args) {
         cout << "Found " << argc - 1 << " arguments." << endl;
     }
     for (int i = 1; i < argc; ++i) {
         // Single arguments
         if (argv[i] == (string) "sequential") {
             runIsland = false;
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Mode " << argv[i] << endl;
             }
         } else if (argv[i] == (string) "island") {
             runIsland = true;
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Mode " << argv[i] << endl;
             }
         }
@@ -93,7 +99,7 @@ void parse_args(int argc, char** argv, bool verbose=false) {
                 cerr << "Invalid integer for " << argv[i] << endl;
                 exit(1);
             }
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Number of epochs:\t" << argv[i+1] << endl;
             }
         } else if (argv[i] == (string) "--data") {
@@ -104,7 +110,7 @@ void parse_args(int argc, char** argv, bool verbose=false) {
                 cerr << "Invalid data file" << endl;
                 exit(1);
             }
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Problem name:\t\t" << argv[i+1] << endl;
             }
         } else if (argv[i] == (string) "--population") {
@@ -115,13 +121,13 @@ void parse_args(int argc, char** argv, bool verbose=false) {
                 cerr << "Invalid integer for " << argv[i] << endl;
                 exit(1);
             }
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Number of individuals:\t" << argv[i+1] << endl;
             }
         } else if (argv[i] == (string) "--log_dir") {
             assert(i + 1 < argc);
             log_dir = argv[i + 1];
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Logging location:\t" << argv[i+1] << endl;
             }
         } else if (argv[i] == (string) "--migration_period") {
@@ -132,7 +138,7 @@ void parse_args(int argc, char** argv, bool verbose=false) {
                 cerr << "Invalid integer for " << argv[i] << endl;
                 exit(1);
             }
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Migration Period:\t" << argv[i+1] << endl;
             }
         } else if (argv[i] == (string) "--migration_amount") {
@@ -143,19 +149,8 @@ void parse_args(int argc, char** argv, bool verbose=false) {
                 cerr << "Invalid integer for " << argv[i] << endl;
                 exit(1);
             }
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Migration Amount:\t" << argv[i+1] << endl;
-            }
-        } else if (argv[i] == (string) "--num_migrations") {
-            assert(i + 1 < argc);
-            try {
-                num_migrations = stoi(argv[i+1]);
-            } catch (const std::invalid_argument &e) {
-                cerr << "Invalid integer for " << argv[i] << endl;
-                exit(1);
-            }
-            if (verbose) {
-                cout << "Number of Migrations:\t" << argv[i+1] << endl;
             }
         } else if (argv[i] == (string) "--elite_size") {
             assert(i + 1 < argc);
@@ -165,7 +160,7 @@ void parse_args(int argc, char** argv, bool verbose=false) {
                 cerr << "Invalid integer for " << argv[i] << endl;
                 exit(1);
             }
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Elite size:\t" << argv[i+1] << endl;
             }
         } else if (argv[i] == (string) "--mutation") {
@@ -176,19 +171,68 @@ void parse_args(int argc, char** argv, bool verbose=false) {
                 cerr << "Invalid integer for " << argv[i] << endl;
                 exit(1);
             }
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Mutation:\t" << argv[i+1] << endl;
             }
         } else if (argv[i] == (string) "--verbose") {
             assert(i + 1 < argc);
             try {
-                verbose = stoi(argv[i+1]);
+                verbose_args = stoi(argv[i + 1]);
             } catch (const std::invalid_argument &e) {
                 cerr << "Invalid integer for " << argv[i] << endl;
                 exit(1);
             }
-            if (verbose) {
+            if (verbose_args) {
                 cout << "Verbose:\t" << argv[i+1] << endl;
+            }
+        } else if (argv[i] == (string) "--migration_topology") {
+            assert(i + 1 < argc);
+            if (argv[i+1] == (string) "isolated") {
+                migration_topology = Island::MigrationTopology::ISOLATED;
+            } else if (argv[i+1] == (string) "ring") {
+                migration_topology = Island::MigrationTopology::RING;
+            } else if (argv[i+1] == (string) "fully_connected") {
+                migration_topology = Island::MigrationTopology::FULLY_CONNECTED;
+            } else {
+                cerr << "Invalid choice (" << argv[i+1] << ") for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose_args) {
+                cout << "Migration Topology:\t" << argv[i+1] << endl;
+            }
+        } else if (argv[i] == (string) "--selection_policy") {
+            assert(i + 1 < argc);
+            if (argv[i+1] == (string) "pure_random") {
+                selection_policy = Island::SelectionPolicy::PURE_RANDOM;
+            } else if (argv[i+1] == (string) "truncation") {
+                selection_policy = Island::SelectionPolicy::TRUNCATION;
+            } else if (argv[i+1] == (string) "fitness_proportionate_selection") {
+                selection_policy = Island::SelectionPolicy::FITNESS_PROPORTIONATE_SELECTION;
+            } else if (argv[i+1] == (string) "stochastic_universal_sampling") {
+                selection_policy = Island::SelectionPolicy::STOCHASTIC_UNIVERSAL_SAMPLING;
+            } else if (argv[i+1] == (string) "tournament_selection") {
+                selection_policy = Island::SelectionPolicy::TOURNAMENT_SELECTION;
+            } else {
+                cerr << "Invalid choice (" << argv[i+1] << ") for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose_args) {
+                cout << "Selection Policy:\t" << argv[i+1] << endl;
+            }
+        } else if (argv[i] == (string) "--replacement_policy") {
+            assert(i + 1 < argc);
+            if (argv[i+1] == (string) "pure_random") {
+                replacement_policy = Island::ReplacementPolicy::PURE_RANDOM;
+            } else if (argv[i+1] == (string) "truncation") {
+                replacement_policy = Island::ReplacementPolicy::TRUNCATION;
+            } else if (argv[i+1] == (string) "dejong_crowding") {
+                replacement_policy = Island::ReplacementPolicy::DEJONG_CROWDING;
+            } else {
+                cerr << "Invalid choice (" << argv[i+1] << ") for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose_args) {
+                cout << "Replacement Policy:\t" << argv[i+1] << endl;
             }
         }
     }
@@ -327,11 +371,11 @@ int main(int argc, char** argv) {
     // ISLAND MODEL
     } else if (runIsland) {
         
-        Island island(problem, Island::MigrationTopology::FULLY_CONNECTED, 4, 200, // immigrants RECEIVED per migration, migration period
-                      Island::SelectionPolicy::TOURNAMENT_SELECTION,
-                      Island::ReplacementPolicy::PURE_RANDOM);
+        Island island(problem, migration_topology, migration_amount, migration_period, // immigrants RECEIVED per migration, migration period
+                      selection_policy,
+                      replacement_policy);
         
-        double bestDistance = island.solve(1000); // number of evolution steps
+        double bestDistance = island.solve(nr_epochs); // number of evolution steps
         if (verbose > 0) {
             cout << bestDistance << endl;
         }

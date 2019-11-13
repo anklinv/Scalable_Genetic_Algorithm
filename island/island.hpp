@@ -62,9 +62,9 @@ public:
     /// Executes the GA on the current rank. Because of MPI_Allgather it is necessary that all ranks in MPI_COMM_WORLD
     /// execute the GA simultaneously.
     ///
-    /// \param NUM_EVOLUTIONS the number of evolution steps for the algorithm to run
+    /// \param numEvolutions the number of evolution steps for the algorithm to run
     /// \return the length of the shortest path found by the algorithm
-    double solve(const int NUM_EVOLUTIONS);
+    double solve(const int numEvolutions);
     
     
 private:
