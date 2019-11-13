@@ -1,0 +1,45 @@
+{
+  "name" : "grid search island",
+  "repetitions" : 1,
+  "fixed_params" : {
+    "-n" : 8,
+    "mode": "island",
+    "--population": 512,
+    "--elite_size": 16,
+    "--mutation": 16,
+    "--epochs": 5000,
+    "--data": "berlin52.csv"
+  },
+  "variable_params" : {
+    "--migration_period": {
+        "type": "list",
+        "list": [
+            1, 5, 10, 15, 20, 50, 100, 200
+        ]
+    },
+    "--migration_amount": {
+        "type": "list",
+        "list": [
+            5, 25, 50, 75, 100, 250
+        ]
+    },
+    "--migration_topology": {
+        "type": "list",
+        "list": [
+            "fully_connected"
+        ]
+    },
+    "--selection_policy": {
+        "type": "list",
+        "list": [
+            "tournament_selection"
+        ]
+    },
+    "--replacement_policy" {
+        "type": "list",
+        "list": [
+            "truncation"
+        ]
+    }
+  }
+}
