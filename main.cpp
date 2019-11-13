@@ -54,7 +54,7 @@ Island::MigrationTopology migration_topology = Island::MigrationTopology::FULLY_
 Island::SelectionPolicy selection_policy = Island::SelectionPolicy::TOURNAMENT_SELECTION;
 
 // --replacement_policy {pure_random, truncation, dejong_crowding}
-Island::ReplacementPolicy replacement_policy = Island::ReplacementPolicy::PURE_RANDOM;
+Island::ReplacementPolicy replacement_policy = Island::ReplacementPolicy::TRUNCATION;
 
 // --verbose
 int verbose = 0;

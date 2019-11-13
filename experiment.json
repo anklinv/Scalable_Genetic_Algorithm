@@ -3,24 +3,23 @@
   "repetitions" : 10,
   "fixed_params" : {
     "-n" : 8,
-    "--population": 1000,
+    "--population": 512,
     "--elite_size": 16,
     "--mutation": 16,
-    "--epochs": 50000,
+    "--epochs": 5000,
     "--migration_period": 200,
-    "--num_migrations": 250,
-    "--migration_amount": 5
+    "--migration_amount": 5,
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "tournament_selection",
+    "--replacement_policy": "truncation"
   },
   "variable_params" : {
     "--data": {
       "type": "list",
       "list": [
-        "a280.csv",
-        "att532.csv",
-        "bier127.csv",
-        "ch130.csv",
-        "d493.csv",
-        "d1291.csv"
+        "att48.csv",
+        "bays29.csv",
+        "berlin52.csv"
       ]
     },
     "mode": {
