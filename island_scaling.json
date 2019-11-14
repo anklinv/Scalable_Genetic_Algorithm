@@ -1,27 +1,28 @@
 {
-  "name" : "test population sizes",
+  "name" : "island scaling",
   "repetitions" : 20,
   "fixed_params" : {
-	  "mode" : "sequential",
-    "-n" : 1,
+    "mode" : "island",
+    "--population": 512,
     "--elite_size": 16,
     "--mutation": 16,
     "--epochs": 5000,
-    "--migration_period": 200,
+    "--migration_period": 10,
     "--migration_amount": 5,
     "--migration_topology": "fully_connected",
     "--selection_policy": "tournament_selection",
     "--replacement_policy": "truncation"
   },
   "variable_params" : {
-  	"--population" : {
+    "-n" : {
   		"type": "list",
   		"list": [
-        512,
-        1024,
-        2048,
-        4096,
-        8192
+  			1,
+  			2,
+  			4,
+  			8,
+  			16,
+  			32
   		]
   	},
     "--data": {

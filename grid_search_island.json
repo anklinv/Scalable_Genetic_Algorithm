@@ -8,7 +8,10 @@
     "--elite_size": 16,
     "--mutation": 16,
     "--epochs": 1000,
-    "--data": "berlin52.csv"
+    "--data": "berlin52.csv",
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "tournament_selection",
+    "--replacement_policy": "truncation"
   },
   "variable_params" : {
     "--migration_period": {
@@ -20,25 +23,7 @@
     "--migration_amount": {
         "type": "list",
         "list": [
-            5, 25, 50, 75, 100, 250
-        ]
-    },
-    "--migration_topology": {
-        "type": "list",
-        "list": [
-            "fully_connected"
-        ]
-    },
-    "--selection_policy": {
-        "type": "list",
-        "list": [
-            "tournament_selection",
-        ]
-    },
-    "--replacement_policy": {
-        "type": "list",
-        "list": [
-            "truncation"
+            1, 5, 25, 50, 75, 100, 250
         ]
     }
   }

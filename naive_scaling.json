@@ -1,35 +1,35 @@
 {
-  "name" : "test scaling of naive",
-  "repetitions" : 10,
+  "name" : "naive scaling",
+  "repetitions" : 20,
   "fixed_params" : {
-	"mode" : "sequential",
+	  "mode" : "sequential",
     "--population": 512,
     "--elite_size": 16,
     "--mutation": 16,
     "--epochs": 5000,
-    "--migration_period": 200,
+    "--migration_period": 10,
     "--migration_amount": 5,
     "--migration_topology": "fully_connected",
     "--selection_policy": "tournament_selection",
     "--replacement_policy": "truncation"
   },
   "variable_params" : {
-	"-n" : {
-		"type": "list",
-		"list": [
-			1,
-			2,
-			4,
-			8,
-			16,
-			32
-		]
-	},
+  	"-n" : {
+  		"type": "list",
+  		"list": [
+        1,
+  			2,
+  			4,
+  			8,
+  			16,
+  			32
+  		]
+  	},
     "--data": {
       "type": "list",
       "list": [
-        "att48.csv",
-        "berlin52.csv"
+        "berlin52.csv",
+        "a280.csv"
       ]
     }
   }
