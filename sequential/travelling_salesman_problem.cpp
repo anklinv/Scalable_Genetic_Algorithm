@@ -149,6 +149,9 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
         this->logger->LOG(BEST_FITNESS, this->fitness_best);
         this->logger->LOG_WC(EPOCH_END);
     }
+    
+    // Island assumes the ranks to be sorted before a migration starts
+    this->rank_individuals();
 
     return this->fitness_best;
 }
