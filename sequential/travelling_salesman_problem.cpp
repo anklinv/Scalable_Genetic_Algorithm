@@ -81,14 +81,9 @@ void TravellingSalesmanProblem::evolve(const int rank) {
     this->rank_individuals();
     
     // Breed children
-    // start = chrono::high_resolution_clock::now();
     this->breed_population();
-    // stop = chrono::high_resolution_clock::now();
-    // duration = chrono::duration_cast<chrono::microseconds>(stop - start);
-    // cout << "\t\tBreeding takes: " << duration.count() << "us (rank " << rank << ")" << endl;
 
     // Mutate population
-    // start = chrono::high_resolution_clock::now();
 #ifdef debug_evolve
     cout << "Before:" << endl;
     for (int i = 0; i < population_count; ++i) {
@@ -109,9 +104,6 @@ void TravellingSalesmanProblem::evolve(const int rank) {
         cout << endl;
     }
 #endif
-    // stop = chrono::high_resolution_clock::now();
-    // duration = chrono::duration_cast<chrono::microseconds>(stop - start);
-    // cout << "\t\tMutation takes: " << duration.count() << "us (rank " << rank << ")" << endl;
 }
 
 double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
@@ -127,20 +119,18 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
 #endif*/
 
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
+        this->logger->LOG_WC(EPOCH_BEGIN);
         if (this->verbose > 0) {
             if (epoch % this->log_iter_freq == 0) {
                 cout << epoch << " of " << nr_epochs << endl;
             }
         }
-        // auto start = chrono::high_resolution_clock::now();
         this->evolve(rank);
-
         if (log_all_values) {
             this->logger->log_all_fitness_per_epoch(this->evolutionCounter, this->fitness);
         } else if (log_best_value) {
             this->logger->log_best_fitness_per_epoch(this->evolutionCounter, this->fitness_best);
         }
-
 #ifdef debug
         // cout << "*** EPOCH " << epoch << " ***" << endl;
         rank_individuals();
@@ -152,12 +142,8 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
             // cout << endl;
         }
 #endif
-        
         this->evolutionCounter = this->evolutionCounter + 1;
-        
-        // auto stop = chrono::high_resolution_clock::now();
-        // auto duration = chrono::duration_cast<chrono::microseconds>(stop - start);
-        // cout << "\t" << duration.count() << " us epoch runtime (epoch " << epoch << " rank " << rank << ")" << endl;
+        this->logger->LOG_WC(EPOCH_END);
     }
 
     this->rank_individuals();
@@ -235,6 +221,7 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, int*
 }
 
 void TravellingSalesmanProblem::breed_population() {
+    this->logger->LOG_WC(BREED_POPULATION_BEGIN);
     int temp_population[this->population_count][this->problem_size];
 
     // Keep the best individuals
@@ -264,6 +251,7 @@ void TravellingSalesmanProblem::breed_population() {
             POP(i, j) = temp_population[i][j];
         }
     }
+    this->logger->LOG_WC(BREED_POPULATION_END);
 }
 
 void TravellingSalesmanProblem::mutate(const int individual) {
@@ -281,6 +269,7 @@ void TravellingSalesmanProblem::mutate(const int individual) {
 }
 
 void TravellingSalesmanProblem::mutate_population() {
+    this->logger->LOG_WC(MUTATE_POPULATION_BEGIN);
     for (int i = this->elite_size / 2; i < this->population_count; ++i) {
 #ifdef debug_mutate
         cout << "mutating individual:" << endl;
@@ -297,6 +286,7 @@ void TravellingSalesmanProblem::mutate_population() {
         cout << endl;
 #endif
     }
+    this->logger->LOG_WC(MUTATE_POPULATION_END);
 }
 
 int TravellingSalesmanProblem::rand_range(const int &a, const int&b) {
