@@ -1,0 +1,37 @@
+{
+  "name" : "test population sizes",
+  "repetitions" : 10,
+  "fixed_params" : {
+	"mode" : "sequential",
+    "-n" : 1,
+    "--elite_size": 16,
+    "--mutation": 16,
+    "--epochs": 5000,
+    "--migration_period": 200,
+    "--migration_amount": 5,
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "tournament_selection",
+    "--replacement_policy": "truncation"
+  },
+  "variable_params" : {
+	"--population" : {
+		"type": "list",
+		"list": [
+			128,
+      256,
+      512,
+      1024,
+      2048,
+      4096,
+      8192
+		]
+	},
+    "--data": {
+      "type": "list",
+      "list": [
+        "att48.csv",
+        "berlin52.csv"
+      ]
+    }
+  }
+}
