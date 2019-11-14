@@ -126,6 +126,9 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
             }
         }
         this->evolve(rank);
+        
+        // - if the best fitness is logged, the best fitness before the previous evolution step is logged (due to ranking)
+        // - the best fitness after the very last evolution is not logged
         if (log_all_values) {
             this->logger->log_all_fitness_per_epoch(this->evolutionCounter, this->fitness);
         } else if (log_best_value) {
@@ -145,13 +148,6 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
         this->evolutionCounter = this->evolutionCounter + 1;
         this->logger->LOG(BEST_FITNESS, this->fitness_best);
         this->logger->LOG_WC(EPOCH_END);
-    }
-
-    this->rank_individuals();
-    if (log_all_values) {
-        this->logger->log_all_fitness_per_epoch(this->evolutionCounter, this->fitness);
-    } else if (log_best_value) {
-        this->logger->log_best_fitness_per_epoch(this->evolutionCounter, this->fitness_best);
     }
 
     return this->fitness_best;
