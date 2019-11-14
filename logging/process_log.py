@@ -86,6 +86,12 @@ class Log(object):
             offset += struct.calcsize(fmt)
             self.log.append((tag, value))
 
+    def get_values(self, name):
+        full_name = f'val_{name}'
+        val_tag_id = self.tags.tag_names[full_name]
+        values = [value for (tag_id, value) in self.log if tag_id == val_tag_id]
+        return values
+
     def get_wall_clock_durations(self, name):
         ''' Automatically appends the wc_ prefix and _begin or _end suffixes'''
         begin_full_name = f'wc_{name}_begin'
@@ -126,6 +132,8 @@ class Log(object):
         
 def last_log():
     log_fns = glob.glob(os.path.join('logs', '*_tags.bin'))
+    if len(log_fns) == 0:
+        raise FileNotFoundError('No log files found')
     #print(log_fns)
     last_log_fn = max(log_fns)
     #print(last_log_fn)
@@ -160,9 +168,10 @@ if __name__ == "__main__":
             f"wall clock {log.get_wall_clock_durations('logging')[0]:.3f}ms",
             f"CPU clock {log.get_cpu_clock_durations('logging')[0]:.3f}ms"
         )
-        ri_arr = log.get_wall_clock_durations('rank_individuals')
-        print('rank_individuals:',
+        ri_arr = log.get_wall_clock_durations('epoch')
+        print('epoch:',
             f"length {len(ri_arr)},",
             f"mean {np.mean(ri_arr):.3f}ms,",
             f"std {np.std(ri_arr):.3f}ms"
         )
+        print('best fitness:', log.get_values('best_fitness'))

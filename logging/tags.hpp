@@ -32,4 +32,8 @@
 #define LOGGING_TAG_CC_LOGGING_BEGIN   0x02000000
 #define LOGGING_TAG_CC_LOGGING_END     0x02000001
 
+// -----------------------------------------------------------------------------
+// values
+// -----------------------------------------------------------------------------
 
+#define LOGGING_TAG_VAL_BEST_FITNESS    0x03000000

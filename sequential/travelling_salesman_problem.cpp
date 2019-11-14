@@ -143,6 +143,7 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
         }
 #endif
         this->evolutionCounter = this->evolutionCounter + 1;
+        this->logger->LOG(BEST_FITNESS, this->fitness_best);
         this->logger->LOG_WC(EPOCH_END);
     }
 
