@@ -1,13 +1,13 @@
 {
   "name" : "grid search island",
-  "repetitions" : 1,
+  "repetitions" : 10,
   "fixed_params" : {
     "-n" : 8,
     "mode": "island",
     "--population": 512,
     "--elite_size": 16,
     "--mutation": 16,
-    "--epochs": 5000,
+    "--epochs": 1000,
     "--data": "berlin52.csv"
   },
   "variable_params" : {
@@ -32,7 +32,7 @@
     "--selection_policy": {
         "type": "list",
         "list": [
-            "truncation"
+            "tournament_selection",
         ]
     },
     "--replacement_policy": {
