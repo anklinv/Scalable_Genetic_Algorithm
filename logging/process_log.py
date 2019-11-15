@@ -175,6 +175,10 @@ class Epochs(object):
             [e.end for e in self.epochs]
         )
 
+    def get_fitness_vs_time_dataframe(self):
+        return ((e.fitness, e.end, epoch) for epoch, e in enumerate(self.epochs))
+
+
 def last_log():
     log_fns = glob.glob(os.path.join('logs', '*_tags.bin'))
     if len(log_fns) == 0:
