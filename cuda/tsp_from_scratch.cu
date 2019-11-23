@@ -21,11 +21,12 @@
 #define NPOP(i,j) new_population[i * PROB_SIZE + j]
 #define DIST(i,j) problem[i * PROB_SIZE + j]
 
-typedef thrust::device_vector<int>::iterator iit;
+//https://stackoverflow.com/questions/1577475/c-sorting-and-keeping-track-of-indexes
+//https://github.com/thrust/thrust/wiki/Quick-Start-Guide#fancy-iterators
 
 using namespace std;
 
-__global__ void rank_individuals(int *population, float *problem, float *fitness) {
+__global__ void rank_individuals(int *population, float *problem, float *fitness, float *sorted_fitness) {
 	//blockDim: number of threads in block
 	//gridDim: number of blocks in grid
 	int index = threadIdx.x + blockIdx.x * blockDim.x;
@@ -34,7 +35,7 @@ __global__ void rank_individuals(int *population, float *problem, float *fitness
 			fitness[i] += DIST(j,j+1);
 		}
 		fitness[i] += DIST(PROB_SIZE - 1, 0);
-		fitness[i] = 1/fitness[i];
+		//fitness[i] = 1/fitness[i];
 	}
 	__syncthreads();
 }
@@ -74,6 +75,8 @@ __global__ void crossover(int *population, float *fitness, int *prefix_sort_fint
 	}
 	__syncthreads();					
 }
+
+__global__ void
 
 int main (void) {
 
