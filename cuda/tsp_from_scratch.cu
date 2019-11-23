@@ -10,6 +10,8 @@
 #include <cassert>
 #include <math.h>
 
+#include <thrust/sort.h>
+
 #define POP_SIZE 1000
 #define PROB_SIZE 48
 #define EPOCHS 100
@@ -17,10 +19,12 @@
 #define POP(i,j) population[i * PROB_SIZE + j]
 #define DIST(i,j) problem[i * PROB_SIZE + j]
 
+//https://stackoverflow.com/questions/1577475/c-sorting-and-keeping-track-of-indexes
+//https://github.com/thrust/thrust/wiki/Quick-Start-Guide#fancy-iterators
 
 using namespace std;
 
-__global__ void rank_individuals(int *population, float *problem, float *fitness) {
+__global__ void rank_individuals(int *population, float *problem, float *fitness, float *sorted_fitness) {
 	//blockDim: number of threads in block
 	//gridDim: number of blocks in grid
 	int index = threadIdx.x + blockIdx.x * blockDim.x;
@@ -29,9 +33,19 @@ __global__ void rank_individuals(int *population, float *problem, float *fitness
 			fitness[i] += DIST(j,j+1);
 		}
 		fitness[i] += DIST(PROB_SIZE - 1, 0);
-		fitness[i] = 1/fitness[i];
+		//fitness[i] = 1/fitness[i];
 	}
+    __synchthreads();
+    thrust::sort(fitness,fitness+sorted_fitness, [this] (int i, int j) {
+        return fitness[i] < fitness[j];
+    }
+    __syncthreads();
+    for (int i = index; i < POP_SIZE; i++) {
+        sorted_fitness[i] = 1/sorted_fitness[i];
+    }
 }
+
+__global__ void
 
 int main (void) {
 
