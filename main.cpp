@@ -56,6 +56,9 @@ Island::SelectionPolicy selection_policy = Island::SelectionPolicy::TOURNAMENT_S
 // --replacement_policy {pure_random, truncation, dejong_crowding}
 Island::ReplacementPolicy replacement_policy = Island::ReplacementPolicy::TRUNCATION;
 
+// --underlying_communication {blocking, non_blocking}
+Island::UnderlyingCommunication communication = Island::UnderlyingCommunication::BLOCKING;
+
 // --verbose
 int verbose = 0;
 
@@ -234,6 +237,19 @@ void parse_args(int argc, char** argv, bool verbose_args=false) {
             if (verbose_args) {
                 cout << "Replacement Policy:\t" << argv[i+1] << endl;
             }
+        } else if (argv[i] == (string) "--underlying_communication") {
+            assert(i + 1 < argc);
+            if (argv[i+1] == (string) "blocking") {
+                communication = Island::UnderlyingCommunication::BLOCKING;
+            } else if (argv[i+1] == (string) "non_blocking") {
+                communication = Island::UnderlyingCommunication::NON_BLOCKING;
+            } else {
+                cerr << "Invalid choice (" << argv[i+1] << ") for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose_args) {
+                cout << "Communication:\t" << argv[i+1] << endl;
+            }
         }
     }
 }
@@ -373,7 +389,8 @@ int main(int argc, char** argv) {
         
         Island island(problem, migration_topology, migration_amount, migration_period, // immigrants RECEIVED per migration, migration period
                       selection_policy,
-                      replacement_policy);
+                      replacement_policy,
+                      communication);
         
         double bestDistance = island.solve(nr_epochs); // number of evolution steps
         if (verbose > 0) {

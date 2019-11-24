@@ -7,13 +7,15 @@ using namespace std;
 
 Island::Island(TravellingSalesmanProblem& TSP,
                const MigrationTopology mt, const int numIndivsReceivedPerMigration, const int migrationPeriod,
-               const SelectionPolicy sp, const ReplacementPolicy rp):
+               const SelectionPolicy sp, const ReplacementPolicy rp,
+               const UnderlyingCommunication communication):
 TSP(TSP),
 MIGRATION_TOPOLOGY(mt),
 NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION(numIndivsReceivedPerMigration),
 MIGRATION_PERIOD(migrationPeriod),
 SELECTION_POLICY(sp),
-REPLACEMENT_POLICY(rp) { // initializer list
+REPLACEMENT_POLICY(rp),
+COMMUNICATION(communication) { // initializer list
         
     int status;
     
@@ -40,6 +42,14 @@ REPLACEMENT_POLICY(rp) { // initializer list
     
     receiveBufferGenes = new int[numIndividualsReceiveBuffer * numIntegersGene];
     receiveBufferFitness = new double[numIndividualsReceiveBuffer];
+    
+    
+    // initialize communication request handles to null such that they do not block
+    // during the first migration
+    sendBufferFitnessRequest = MPI_REQUEST_NULL;
+    sendBufferGenesRequest = MPI_REQUEST_NULL;
+    MPI_Request receiveBufferFitnessRequest = MPI_REQUEST_NULL;
+    MPI_Request receiveBufferGenesRequest = MPI_REQUEST_NULL;
     
 }
 
@@ -387,7 +397,7 @@ int Island::computeSendBufferSize() { // TODO: could be implemented in a more fu
             
             int numSenders = sizeCommWorld - 1;
             
-            if (numSenders == 0) { // bug fix for mpiexed -np 1
+            if (numSenders == 0) { // bug fix for mpiexec -np 1
                 return 0;
             }
             
@@ -513,6 +523,8 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
         
         case MigrationTopology::FULLY_CONNECTED: {
             
+            fillSendBuffers();
+            
             // "Gathers data from all tasks and distribute the combined data to all tasks"
             // - I suppose this is synchronized
             // - amount of data sent == amount of data received from any process
@@ -521,6 +533,9 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
             
             MPI_Allgather(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
                           receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT, MPI_COMM_WORLD);
+            
+            emptyReceiveBuffers();
+            
             break;
         }
         
@@ -545,6 +560,9 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
             const int FITNESS_TAG = 0x01011;
             const int GENE_TAG = 0x01100;
             
+            
+            fillSendBuffers();
+            
             int status = MPI_Sendrecv(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
                                       destRankID, FITNESS_TAG,
                                       receiveBufferFitness, numIndividualsReceiveBuffer, MPI_DOUBLE,
@@ -556,10 +574,253 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
                                   receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, MPI_INT,
                                   srcRankID, GENE_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             //assert(status == MPI_SUCCESS);
+            
+            emptyReceiveBuffers();
                         
             break;
         }
         
+    } // end switch case
+    
+}
+
+
+void Island::doNonblockingCommunicationSetup() {
+    
+    switch(MIGRATION_TOPOLOGY) {
+            
+        case MigrationTopology::FULLY_CONNECTED: {
+                
+            // initiate Iallgather
+            fillSendBuffers();
+                
+            MPI_Iallgather(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
+                           receiveBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
+                           MPI_COMM_WORLD, &receiveBufferFitnessRequest);
+                
+            MPI_Iallgather(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
+                           receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
+                           MPI_COMM_WORLD, &receiveBufferGenesRequest);
+            
+            break;
+        }
+            
+        case MigrationTopology::ISOLATED: {
+            
+            // do nothing (as opposed to Barrier in synchronous blocking communication)
+            break;
+        }
+        
+        case MigrationTopology::RING: {
+            
+            const int FITNESS_TAG = 0x01011;
+            const int GENE_TAG = 0x01100;
+            
+            
+            // initiate Isend
+            int destRankID = (rankID + 1) % sizeCommWorld;
+            
+            fillSendBuffers();
+            
+            MPI_Isend(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE, destRankID,
+                      FITNESS_TAG, MPI_COMM_WORLD, &sendBufferFitnessRequest);
+            
+            MPI_Isend(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT, destRankID,
+                      GENE_TAG, MPI_COMM_WORLD, &sendBufferGenesRequest);
+            
+            
+            // initiate Ireceive
+            int srcRankID = rankID - 1;
+            if(srcRankID < 0) {
+                srcRankID = sizeCommWorld - 1;
+            }
+            
+            MPI_Irecv(receiveBufferFitness, numIndividualsReceiveBuffer, MPI_DOUBLE, srcRankID,
+                      FITNESS_TAG, MPI_COMM_WORLD, &receiveBufferFitnessRequest);
+            
+            MPI_Irecv(receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, MPI_INT, srcRankID,
+                      GENE_TAG, MPI_COMM_WORLD, &receiveBufferGenesRequest);
+            
+            break;
+        }
+    
+    } // end switch case
+    
+}
+
+
+void Island::doNonblockingCommunication() {
+    
+    switch(MIGRATION_TOPOLOGY) {
+            
+        case MigrationTopology::FULLY_CONNECTED: {
+            
+            // wait on last Iallgather
+            MPI_Wait(&receiveBufferFitnessRequest, MPI_STATUS_IGNORE);
+            MPI_Wait(&receiveBufferGenesRequest, MPI_STATUS_IGNORE);
+            
+            emptyReceiveBuffers();
+            
+            
+            // initiate Iallgather
+            fillSendBuffers();
+            
+            MPI_Iallgather(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
+                           receiveBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
+                           MPI_COMM_WORLD, &receiveBufferFitnessRequest);
+            
+            MPI_Iallgather(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
+                           receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
+                           MPI_COMM_WORLD, &receiveBufferGenesRequest);
+            
+            break;
+        }
+            
+        case MigrationTopology::ISOLATED: {
+            
+            // do nothing (as opposed to Barrier in synchronous blocking communication)
+            break;
+        }
+            
+        case MigrationTopology::RING: {
+            
+            const int FITNESS_TAG = 0x01011;
+            const int GENE_TAG = 0x01100;
+            
+            
+            // do alternating (send, recv), (recv, send) to avoid a deadlock
+            // for a ring it only works if the largest rankID is odd!
+            if(rankID % 2 == 0) {
+                
+                // wait on last Isend, initiate Isend
+                MPI_Wait(&sendBufferFitnessRequest, MPI_STATUS_IGNORE);
+                MPI_Wait(&sendBufferGenesRequest, MPI_STATUS_IGNORE);
+                
+                int destRankID = (rankID + 1) % sizeCommWorld;
+                
+                fillSendBuffers();
+                
+                MPI_Isend(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE, destRankID,
+                          FITNESS_TAG, MPI_COMM_WORLD, &sendBufferFitnessRequest);
+                
+                MPI_Isend(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT, destRankID,
+                          GENE_TAG, MPI_COMM_WORLD, &sendBufferGenesRequest);
+                
+                
+                // wait on last Irecv, initiate Irecv
+                MPI_Wait(&receiveBufferFitnessRequest, MPI_STATUS_IGNORE);
+                MPI_Wait(&receiveBufferGenesRequest, MPI_STATUS_IGNORE);
+                
+                emptyReceiveBuffers();
+                
+                int srcRankID = rankID - 1;
+                if(srcRankID < 0) {
+                    srcRankID = sizeCommWorld - 1;
+                }
+                
+                MPI_Irecv(receiveBufferFitness, numIndividualsReceiveBuffer, MPI_DOUBLE, srcRankID,
+                          FITNESS_TAG, MPI_COMM_WORLD, &receiveBufferFitnessRequest);
+                
+                MPI_Irecv(receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, MPI_INT, srcRankID,
+                          GENE_TAG, MPI_COMM_WORLD, &receiveBufferGenesRequest);
+                
+                
+            } else { // rankID % 2 == 1
+                
+                // wait on last Irecv, initiate Irecv
+                MPI_Wait(&receiveBufferFitnessRequest, MPI_STATUS_IGNORE);
+                MPI_Wait(&receiveBufferGenesRequest, MPI_STATUS_IGNORE);
+                
+                emptyReceiveBuffers();
+                                
+                int srcRankID = rankID - 1;
+                if(srcRankID < 0) {
+                    srcRankID = sizeCommWorld - 1;
+                }
+                
+                MPI_Irecv(receiveBufferFitness, numIndividualsReceiveBuffer, MPI_DOUBLE, srcRankID,
+                          FITNESS_TAG, MPI_COMM_WORLD, &receiveBufferFitnessRequest);
+                
+                MPI_Irecv(receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, MPI_INT, srcRankID,
+                          GENE_TAG, MPI_COMM_WORLD, &receiveBufferGenesRequest);
+                
+                
+                // wait on last Isend, initiate Isend
+                MPI_Wait(&sendBufferFitnessRequest, MPI_STATUS_IGNORE);
+                MPI_Wait(&sendBufferGenesRequest, MPI_STATUS_IGNORE);
+                                
+                fillSendBuffers();
+                
+                int destRankID = (rankID + 1) % sizeCommWorld;
+                
+                MPI_Isend(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE, destRankID,
+                          FITNESS_TAG, MPI_COMM_WORLD, &sendBufferFitnessRequest);
+                
+                MPI_Isend(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT, destRankID,
+                          GENE_TAG, MPI_COMM_WORLD, &sendBufferGenesRequest);
+
+            }
+            
+            break;
+        }
+            
+    } // end switch case
+    
+}
+
+
+void Island::doNonblockingCommunicationCleanup() {
+    
+    switch(MIGRATION_TOPOLOGY) {
+        
+        case MigrationTopology::FULLY_CONNECTED: {
+            
+            // wait on Iallgather
+            MPI_Wait(&receiveBufferFitnessRequest, MPI_STATUS_IGNORE);
+            MPI_Wait(&receiveBufferGenesRequest, MPI_STATUS_IGNORE);
+            
+            emptyReceiveBuffers();
+            
+            break;
+        }
+            
+        case MigrationTopology::ISOLATED: {
+                
+            // do nothing (as opposed to Barrier in synchronous blocking communication)
+            break;
+        }
+            
+        case MigrationTopology::RING: {
+            
+            if(rankID % 2 == 0) {
+                
+                // wait on Isend
+                MPI_Wait(&sendBufferFitnessRequest, MPI_STATUS_IGNORE);
+                MPI_Wait(&sendBufferGenesRequest, MPI_STATUS_IGNORE);
+                
+                // wait on Ireceive
+                MPI_Wait(&receiveBufferFitnessRequest, MPI_STATUS_IGNORE);
+                MPI_Wait(&receiveBufferGenesRequest, MPI_STATUS_IGNORE);
+                
+                emptyReceiveBuffers();
+                
+            } else {
+                
+                // wait on Ireceive
+                MPI_Wait(&receiveBufferFitnessRequest, MPI_STATUS_IGNORE);
+                MPI_Wait(&receiveBufferGenesRequest, MPI_STATUS_IGNORE);
+                
+                emptyReceiveBuffers();
+                
+                // wait on Isend
+                MPI_Wait(&sendBufferFitnessRequest, MPI_STATUS_IGNORE);
+                MPI_Wait(&sendBufferGenesRequest, MPI_STATUS_IGNORE);
+                
+            }
+            
+            break;
+        }
+            
     } // end switch case
     
 }
@@ -590,29 +851,74 @@ void Island::emptyReceiveBuffers() { // TODO: maybe use a function pointer which
 
 
 double Island::solve(const int numEvolutions) {
-    
+        
     int numPeriods = numEvolutions / MIGRATION_PERIOD;
+        
+    switch(COMMUNICATION) {
+            
+        case UnderlyingCommunication::BLOCKING: {
+            break;
+        }
+            
+        case UnderlyingCommunication::NON_BLOCKING: {
+            if (numPeriods >= 1) {
+                // initiate first nonblocking send, recv
+                doNonblockingCommunicationSetup();
+            }
+            // needs doNonblockingCommunication() or doNonblockingCommunicationCleanup()
+            // to be called after this
+            break;
+        }
+            
+        case UnderlyingCommunication::RMA: {
+            break;
+        }
+    } // end switch case
+    
         
     for(int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
         
         // Run the GA for MIGRATION_PERIOD iterations
         TSP.solve(MIGRATION_PERIOD, rankID);
         
+        
         // MPI part (Migration part)
-        fillSendBuffers();
-        
-        doSynchronousBlockingCommunication();
-        
-        emptyReceiveBuffers();
+        switch(COMMUNICATION) {
+                
+            case UnderlyingCommunication::BLOCKING: {
+                
+                doSynchronousBlockingCommunication();
+                break;
+            }
+                
+            case UnderlyingCommunication::NON_BLOCKING: {
+                
+                if (currPeriod < numPeriods - 1) {
+                    doNonblockingCommunication();
+                    // needs doNonblockingCommunication() or doNonblockingCommunicationCleanup()
+                    // to be called after this
+                } else {
+                    // don't initiate any new nonblocking send, recv
+                    doNonblockingCommunicationCleanup();
+                }
+                
+                break;
+            }
+                
+            case UnderlyingCommunication::RMA: {
+                break;
+            }
+        } // end switch case
         
     }
     
+    // deal with excess iterations that no more fit in a migration period
     if (numEvolutions % MIGRATION_PERIOD != 0) {
         
         TSP.solve(numEvolutions % MIGRATION_PERIOD, rankID);
     }
     
-    return TSP.getMinFitness();
     
+    return TSP.getMinFitness();
 }
 

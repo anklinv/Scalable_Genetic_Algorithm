@@ -74,6 +74,11 @@ TravellingSalesmanProblem::~TravellingSalesmanProblem() {
 void TravellingSalesmanProblem::set_logger(Logger *_logger) {
     this->logger = _logger;
     this->logger->open();
+    
+    // necessary for island. this way the rank vector can be used after object
+    // creation. can't be called in the constructor as the logger is used inside
+    // rank_individuals().
+    this->rank_individuals();
 }
 
 void TravellingSalesmanProblem::evolve(const int rank) {

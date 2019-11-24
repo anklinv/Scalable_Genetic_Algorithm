@@ -14,12 +14,6 @@
 using namespace std;
 
 
-// TODO: ASYNCHRONOUS VERSION
-// e.g. loop with periodic checking
-// e.g. nonblocking send and receive with periodic checking
-// cf lecture
-
-
 class Island {
     
 public:
@@ -45,6 +39,13 @@ public:
     };
     
     
+    enum class UnderlyingCommunication {
+        BLOCKING,
+        NON_BLOCKING,
+        RMA
+    };
+    
+    
     /// An Island wraps around a TravellingSalesmanProblem:
     /// - Fitness evaluation (C_eval) , cross-over and mutation (C_oper) are done by the underlying TSP
     /// - The Island adds communication (C_comm)  and performs selection and replacement in this context (C_oper)
@@ -55,7 +56,8 @@ public:
     /// \param TSP a fully initialized TSP
     Island(TravellingSalesmanProblem& TSP,
            const MigrationTopology mt, const int numIndivsReceivedPerMigration, const int migrationPeriod,
-           const SelectionPolicy sp, const ReplacementPolicy rp);
+           const SelectionPolicy sp, const ReplacementPolicy rp,
+           const UnderlyingCommunication communication);
     ~Island();
     
 
@@ -104,6 +106,10 @@ private:
     const ReplacementPolicy REPLACEMENT_POLICY;
     
     
+    /// Underlying MPI communication
+    const UnderlyingCommunication COMMUNICATION;
+    
+    
     /// For convenience. Size of MPI_COMM_WORLD.  It is necessary that all ranks in MPI_COMM_WORLD execute
     /// the GA simultaneously.
     int sizeCommWorld;
@@ -145,12 +151,40 @@ private:
     double* receiveBufferFitness;
     
     
+    /// Communication request handle for nonblocking communication. Needed to check if the nonblocking send has been executed
+    /// such that the send buffer can be reused.
+    MPI_Request sendBufferFitnessRequest;
+
+    /// Communication request handle for nonblocking communication. Needed to check if the nonblocking send has been executed
+    /// such that the send buffer can be reused.
+    MPI_Request sendBufferGenesRequest;
+
+    /// Communication request handle for nonblocking communication. Needed to check if the nonblocking receive has been executed
+    /// such that the receive buffer can be reused.
+    MPI_Request receiveBufferFitnessRequest;
+
+    /// Communication request handle for nonblocking communication. Needed to check if the nonblocking receive has been executed
+    /// such that the receive buffer can be reused.
+    MPI_Request receiveBufferGenesRequest;
+    
+    
     /// Empties the receive buffers and integrates the data into the current Island data according to the REPLACEMENT_POLICY.
     void emptyReceiveBuffers();
     
-    /// Transfers the data stored inside the send buffers according to the MIGRATION_TOPOLOGY in a synchronized
-    /// and blocking fashion. The data received is stored inside the receive buffers as the function returns.
+    /// Fills the send buffers, transfers the data according to the MIGRATION_TOPOLOGY in a synchronized and blocking
+    /// fashion and empties the receive buffers.
     void doSynchronousBlockingCommunication();
+    
+    /// Starts nonblocking communication requests without waiting for previous communication requests to have finished. Needed
+    /// before the first doNonblockingCommunication().
+    void doNonblockingCommunicationSetup();
+    
+    /// Starts nonblocking communication requests after ensuring that all previous nonblocking communication requests
+    /// have finished. Called after each MIGRATION_PERIOD.
+    void doNonblockingCommunication();
+    
+    /// Calls wait for all pending nonblocking communication requests. Needed before MPI_Finalize().
+    void doNonblockingCommunicationCleanup();
     
     /// Uses the SELECTION_POLICY to fill sendBufferFitnesses and sendBufferGenes with data.
     void fillSendBuffers();
