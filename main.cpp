@@ -56,7 +56,7 @@ Island::SelectionPolicy selection_policy = Island::SelectionPolicy::TOURNAMENT_S
 // --replacement_policy {pure_random, truncation, dejong_crowding}
 Island::ReplacementPolicy replacement_policy = Island::ReplacementPolicy::TRUNCATION;
 
-// --underlying_communication {blocking, non_blocking}
+// --underlying_communication {blocking, non_blocking, rma}
 Island::UnderlyingCommunication communication = Island::UnderlyingCommunication::BLOCKING;
 
 // --verbose
@@ -243,6 +243,8 @@ void parse_args(int argc, char** argv, bool verbose_args=false) {
                 communication = Island::UnderlyingCommunication::BLOCKING;
             } else if (argv[i+1] == (string) "non_blocking") {
                 communication = Island::UnderlyingCommunication::NON_BLOCKING;
+            } else if (argv[i+1] == (string) "rma") {
+                communication = Island::UnderlyingCommunication::RMA;
             } else {
                 cerr << "Invalid choice (" << argv[i+1] << ") for " << argv[i] << endl;
                 exit(1);

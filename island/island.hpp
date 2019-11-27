@@ -171,9 +171,11 @@ private:
     /// Empties the receive buffers and integrates the data into the current Island data according to the REPLACEMENT_POLICY.
     void emptyReceiveBuffers();
     
+    
     /// Fills the send buffers, transfers the data according to the MIGRATION_TOPOLOGY in a synchronized and blocking
     /// fashion and empties the receive buffers.
     void doSynchronousBlockingCommunication();
+    
     
     /// Starts nonblocking communication requests without waiting for previous communication requests to have finished. Needed
     /// before the first doNonblockingCommunication().
@@ -185,6 +187,33 @@ private:
     
     /// Calls wait for all pending nonblocking communication requests. Needed before MPI_Finalize().
     void doNonblockingCommunicationCleanup();
+    
+    
+    MPI_Win fitnessWindow;
+    double* fitnessWindowBaseAddress;
+
+    MPI_Win geneWindow;
+    int* geneWindowBaseAddress;
+
+    MPI_Win lockWindow;
+    int* lockWindowBaseAddress;
+
+    const int RECV_BUFFER_FULL = 1;
+    const int RECV_BUFFER_EMPTY = 0;
+
+    int testBuffer;
+    int ignoreOrigin;
+    
+    void setupRMACommunication();
+    void emptyReceiveBuffersRMA();
+    bool doRMASend();
+    bool doRMAPoll();
+    bool doRMACommunication(bool startMigration);
+    void cleanupRMACommunication();
+    
+    void solveBlocking(const int numEvolutions);
+    void solveNonblocking(const int numEvolutions);
+    void solveRMA(const int numEvolutions);
     
     /// Uses the SELECTION_POLICY to fill sendBufferFitnesses and sendBufferGenes with data.
     void fillSendBuffers();

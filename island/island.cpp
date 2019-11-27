@@ -850,73 +850,324 @@ void Island::emptyReceiveBuffers() { // TODO: maybe use a function pointer which
 }
 
 
-double Island::solve(const int numEvolutions) {
+void Island::setupRMACommunication() {
+    
+    int destRankID = (rankID + 1) % sizeCommWorld;
+    
+    
+    MPI_Win_allocate(numIndividualsReceiveBuffer * sizeof(double),
+                     sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD,
+                     &fitnessWindowBaseAddress, &fitnessWindow);
+    
+    MPI_Win_allocate(numIndividualsReceiveBuffer * numIntegersGene * sizeof(int),
+                     sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD,
+                     &geneWindowBaseAddress, &geneWindow);
         
-    int numPeriods = numEvolutions / MIGRATION_PERIOD;
+    // allocate the memory containing the lock
+    // size is basically the amount of incoming edges
+    MPI_Alloc_mem(1 * sizeof(int),
+                  MPI_INFO_NULL, &lockWindowBaseAddress);
+    // initialize the memory containing the lock
+    *lockWindowBaseAddress = RECV_BUFFER_EMPTY;
+    // put the memory containing the lock in a window
+    MPI_Win_create(lockWindowBaseAddress, 1 * sizeof(int), sizeof(int),
+                   MPI_INFO_NULL, MPI_COMM_WORLD, &lockWindow);
+    
+    
+    // we need access to the window of the destination rank
+    MPI_Win_lock(MPI_LOCK_SHARED, destRankID, 0, fitnessWindow);
+    MPI_Win_lock(MPI_LOCK_SHARED, destRankID, 0, geneWindow);
+    MPI_Win_lock(MPI_LOCK_SHARED, destRankID, 0, lockWindow);
+    
+    // we need need acces to our own window
+    MPI_Win_lock(MPI_LOCK_SHARED, rankID, 0, fitnessWindow);
+    MPI_Win_lock(MPI_LOCK_SHARED, rankID, 0, geneWindow);
+    MPI_Win_lock(MPI_LOCK_SHARED, rankID, 0, lockWindow);
+    
+    
+    // assert that the lock of our own window is correctly initialized
+    MPI_Fetch_and_op(&ignoreOrigin, &testBuffer,
+                     MPI_INT, rankID, 0, // no offset
+                     MPI_NO_OP, lockWindow);
+    MPI_Win_flush(rankID, lockWindow); // block until fetch and op is done
+    assert(testBuffer == RECV_BUFFER_EMPTY);
+    // end assert
+}
+
+
+void Island::emptyReceiveBuffersRMA() {
+    
+    // separate method because the data is read directly from the window memory
+    
+    switch(REPLACEMENT_POLICY) {
+            
+        case ReplacementPolicy::TRUNCATION:
+            
+            truncationReplacement(numIndividualsReceiveBuffer, geneWindowBaseAddress, fitnessWindowBaseAddress);
+            break;
         
-    switch(COMMUNICATION) {
+        case ReplacementPolicy::PURE_RANDOM:
             
-        case UnderlyingCommunication::BLOCKING: {
+            pureRandomReplacement(numIndividualsReceiveBuffer, geneWindowBaseAddress, fitnessWindowBaseAddress);
             break;
-        }
             
-        case UnderlyingCommunication::NON_BLOCKING: {
-            if (numPeriods >= 1) {
-                // initiate first nonblocking send, recv
-                doNonblockingCommunicationSetup();
-            }
-            // needs doNonblockingCommunication() or doNonblockingCommunicationCleanup()
-            // to be called after this
-            break;
-        }
+        case ReplacementPolicy::DEJONG_CROWDING:
             
-        case UnderlyingCommunication::RMA: {
+            crowdingReplacement(numIndividualsReceiveBuffer, geneWindowBaseAddress, fitnessWindowBaseAddress);
             break;
-        }
+            
     } // end switch case
     
+}
+
+
+bool Island::doRMASend() {
+    
+    int destRankID = (rankID + 1) % sizeCommWorld;
+    
+    MPI_Fetch_and_op(&ignoreOrigin, &testBuffer,
+                     MPI_INT, destRankID, 0, // no offset
+                     MPI_NO_OP, lockWindow);
+    MPI_Win_flush(destRankID, lockWindow); // block until fetch and op is done
+    
+    
+    if(testBuffer == RECV_BUFFER_FULL) {
+        // data can't be sent yet
+        return false;
+    } else { // testBuffer == RECV_BUFFER_EMPTY
+        // send
+        fillSendBuffers();
         
+        // atomic nonblocking puts
+        MPI_Accumulate(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
+                       destRankID,
+                       0, numIndividualsSendBuffer, MPI_DOUBLE, MPI_REPLACE, fitnessWindow);
+        
+        MPI_Accumulate(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
+                       destRankID,
+                       0, numIndividualsSendBuffer * numIntegersGene, MPI_INT, MPI_REPLACE, geneWindow);
+        
+        // block until RMA communication is done
+        MPI_Win_flush(destRankID, fitnessWindow);
+        MPI_Win_flush(destRankID, geneWindow);
+        
+        
+        // set "result is there" flag at target
+        // one could use only one of these using clever logical operations
+        // there are a bunch of constants defined in the docs (MPI_NO_OP, MPI_REPLACE, MPI_LXOR, ...)
+        // maybe CAS is more suited for this case
+        // CAS / fetch and op: atomic, work on one variable only
+        // I think they're meant to do locks etc. with
+        MPI_Fetch_and_op(&RECV_BUFFER_FULL, &testBuffer,
+                         MPI_INT, destRankID, 0, // no offset
+                         MPI_NO_OP, lockWindow);
+        MPI_Win_flush(destRankID, lockWindow); // block until fetch and op is done
+        
+        // assert the buffer of the target was empty
+        assert(testBuffer == RECV_BUFFER_EMPTY);
+        // end assert
+        
+        return true;
+    } // end else
+    
+}
+
+
+bool Island::doRMAPoll() {
+    
+    MPI_Fetch_and_op(&ignoreOrigin, &testBuffer,
+                     MPI_INT, rankID, 0, // no offset
+                     MPI_NO_OP, lockWindow);
+    MPI_Win_flush(rankID, lockWindow); // block until fetch and op is done
+    
+    
+    if(testBuffer == RECV_BUFFER_EMPTY) {
+        // no new data arrived
+        return false;
+    } else { // testBuffer == RECV_BUFFER_FULL
+        // receive
+        
+        // potential problem: the window data is directly accessed & it is not protected
+        emptyReceiveBuffersRMA();
+        
+        
+        MPI_Fetch_and_op(&RECV_BUFFER_EMPTY, &testBuffer,
+                         MPI_INT, rankID, 0, // no offset
+                         MPI_NO_OP, lockWindow);
+        MPI_Win_flush(rankID, lockWindow); // block until fetch and op is done
+        
+        // assert the buffer was full
+        assert(testBuffer == RECV_BUFFER_FULL);
+        // end assert
+        
+        return true;
+    } // end else
+    
+}
+
+
+bool Island::doRMACommunication(bool startMigration) {
+    
+    // always do this
+    doRMAPoll();
+    
+    if(startMigration == true) {
+        // indicate whether send was successful
+        return doRMASend();
+    } else {
+        // success as nothing had to be done
+        return true;
+    }
+}
+
+
+void Island::cleanupRMACommunication() {
+    
+    int destRankID = (rankID + 1) % sizeCommWorld;
+    
+    
+    // unlock window of destination rank
+    MPI_Win_unlock(destRankID, fitnessWindow);
+    MPI_Win_unlock(destRankID, geneWindow);
+    MPI_Win_unlock(destRankID, lockWindow);
+    
+    // unlock our own window
+    MPI_Win_unlock(rankID, fitnessWindow);
+    MPI_Win_unlock(rankID, geneWindow);
+    MPI_Win_unlock(rankID, lockWindow);
+    
+    
+    // free window
+    MPI_Win_free(&fitnessWindow);
+    MPI_Win_free(&geneWindow);
+    // free memory allocated with MPI_Alloc_mem
+    MPI_Win_free(&lockWindow); // free window first
+    MPI_Free_mem(lockWindowBaseAddress);
+}
+
+
+void Island::solveBlocking(const int numEvolutions) {
+    
+    int numPeriods = numEvolutions / MIGRATION_PERIOD;
+    
     for(int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
-        
         // Run the GA for MIGRATION_PERIOD iterations
         TSP.solve(MIGRATION_PERIOD, rankID);
-        
-        
         // MPI part (Migration part)
-        switch(COMMUNICATION) {
-                
-            case UnderlyingCommunication::BLOCKING: {
-                
-                doSynchronousBlockingCommunication();
-                break;
-            }
-                
-            case UnderlyingCommunication::NON_BLOCKING: {
-                
-                if (currPeriod < numPeriods - 1) {
-                    doNonblockingCommunication();
-                    // needs doNonblockingCommunication() or doNonblockingCommunicationCleanup()
-                    // to be called after this
-                } else {
-                    // don't initiate any new nonblocking send, recv
-                    doNonblockingCommunicationCleanup();
-                }
-                
-                break;
-            }
-                
-            case UnderlyingCommunication::RMA: {
-                break;
-            }
-        } // end switch case
-        
+        doSynchronousBlockingCommunication();
     }
     
     // deal with excess iterations that no more fit in a migration period
     if (numEvolutions % MIGRATION_PERIOD != 0) {
-        
         TSP.solve(numEvolutions % MIGRATION_PERIOD, rankID);
     }
+    
+}
+
+
+void Island::solveNonblocking(const int numEvolutions) {
+    
+    int numPeriods = numEvolutions / MIGRATION_PERIOD;
+    
+    if (numPeriods >= 1) {
+        // initiate first nonblocking send, recv
+        doNonblockingCommunicationSetup();
+    }
+    // needs doNonblockingCommunication() or doNonblockingCommunicationCleanup()
+    // to be called after this
+    
+    for(int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
+        // Run the GA for MIGRATION_PERIOD iterations
+        TSP.solve(MIGRATION_PERIOD, rankID);
+        // MPI part (Migration part)
+        if(currPeriod < numPeriods - 1) {
+            doNonblockingCommunication();
+            // needs doNonblockingCommunication() or doNonblockingCommunicationCleanup()
+            // to be called after this
+        } else {
+            // don't initiate any new nonblocking send, recv
+            doNonblockingCommunicationCleanup();
+        }
+    }
+    
+    // deal with excess iterations that no more fit in a migration period
+    if (numEvolutions % MIGRATION_PERIOD != 0) {
+        TSP.solve(numEvolutions % MIGRATION_PERIOD, rankID);
+    }
+    
+}
+
+
+void Island::solveRMA(const int numEvolutions) {
+    
+    int POLLING_PERIOD = max(1, MIGRATION_PERIOD / 8);
+    // polling period is at most 100% of migration period (MIGRATION_PERIOD < 8)
+    // polling eriod is at most 12.5% of migration period (else)
+    
+    int numPeriods = numEvolutions / MIGRATION_PERIOD;
+    int numPolls = MIGRATION_PERIOD / POLLING_PERIOD;
+    // numPolls >= 1 (MIGRATION_PERIOD < 8)
+    // numPolls >= 8 (else)
+    // (important at it must be guaranteed to be >= 1 for the communication to happen)
+    assert(numPolls >= 1);
+    
+    setupRMACommunication();
+    
+    bool startMigration = false;
+    
+    for(int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
+        
+        for(int currPoll = 0; currPoll < numPolls; currPoll++) {
+            if(doRMACommunication(startMigration)) {
+                // send succeeded or startMigration was false
+                // continue polling as we also check for data which can arrive any time
+                startMigration = false;
+            }
+            // POLLING_PERIOD
+            TSP.solve(POLLING_PERIOD, rankID);
+        }
+        
+        // deal with excess iterations that no more fit in a polling period
+        if (MIGRATION_PERIOD % POLLING_PERIOD != 0) {
+            TSP.solve(MIGRATION_PERIOD % POLLING_PERIOD, rankID);
+        }
+        
+        startMigration = true;
+        
+    }
+    
+    // there currently is no final migration after the last migration period
+    
+    
+    // deal with excess iterations that no more fit in a migration period
+    if (numEvolutions % MIGRATION_PERIOD != 0) {
+        TSP.solve(numEvolutions % MIGRATION_PERIOD, rankID);
+    }
+    
+    cleanupRMACommunication();
+    
+}
+
+
+double Island::solve(const int numEvolutions) {
+        
+    switch(COMMUNICATION) {
+            
+        case UnderlyingCommunication::BLOCKING: {
+            solveBlocking(numEvolutions);
+            break;
+        }
+            
+        case UnderlyingCommunication::NON_BLOCKING: {
+            solveNonblocking(numEvolutions);
+            break;
+        }
+            
+        case UnderlyingCommunication::RMA: {
+            solveRMA(numEvolutions);
+            break;
+        }
+    } // end switch case
     
     
     return TSP.getMinFitness();
