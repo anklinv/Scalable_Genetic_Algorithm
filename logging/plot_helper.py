@@ -1,8 +1,10 @@
+import os
+import argparse
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
-from process_log import Tags, Log, Epochs
+from process_log import Tags, Log, Epochs, generate_dataframe
 
 
 def create_barplot(df, ax, nr_bars=10, rnd=-1, ylog=False, thresholds=None):
@@ -58,9 +60,21 @@ def create_barplot(df, ax, nr_bars=10, rnd=-1, ylog=False, thresholds=None):
 
 
 if __name__ == "__main__":
-    logging_directory = "../logs/island_scaling_Nov_15_003228"
-    df = pd.read_csv("island_scaling_fitness_time.gz")
-    df = df.drop(columns="Unnamed: 0")
+    parser = argparse.ArgumentParser(description='Plot GA')
+    parser.add_argument('--dir', dest="dir", help='path to directory with log files or a dataframe')
+    args = parser.parse_args()
+
+    if args.dir.endswith(".gz"):
+        print("Loading dataframe... ", end="")
+        df = pd.read_csv("island_scaling_fitness_time.gz")
+        if "Unnamed: 0" in df:
+            df = df.drop(columns="Unnamed: 0")
+        print("Done!")
+    else:
+        print("Creating dataframe... ", end="")
+        name = os.path.split(args.dir)[1]
+        df = generate_dataframe(args.dir, name)
+        print("Done!")
 
     fig, ax = plt.subplots()
     create_barplot(df[df.data == "a280csv"], ax, rnd=-1)
