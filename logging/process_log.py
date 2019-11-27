@@ -5,6 +5,9 @@ import numpy as np
 import os
 import re
 import struct
+import json
+import pandas as pd
+from collections import OrderedDict
 
 
 class Tags(object):
@@ -195,6 +198,70 @@ def last_log():
 def logs_in_dir(path):
     log_fns = glob.glob(os.path.join(path, '*_tags.bin'))
     return log_fns
+
+
+# Given a log_dir (generated with a leonhard run) and a name, saves a dataframe to name.gz
+# That dataframe contains the epochs, wall clock times, fitness, rep, rank and all the variable parameters
+def generate_dataframe(log_dir, name, tag_loc="tags.hpp"):
+    assert isinstance(name, str), "name must be a string"
+    assert os.path.isdir(log_dir), "log_dir must be a directory"
+    assert os.path.isfile(tag_loc), f"Could not find tag_loc {tag_loc}"
+
+    # Extract tags
+    tags = Tags("tags.hpp")
+
+    all_names = os.listdir(log_dir)
+
+    # Validate JSON
+    json_file = list(filter(lambda x: ".json" in x, all_names))
+    assert len(json_file) > 0, "Found no JSON file in the directory"
+    assert len(json_file) <= 1, "Found multiple JSON files in the directory"
+    json_file = json_file[0]
+
+    # Extract repetitions
+    with open(os.path.join(log_dir, json_file)) as file:
+        json_file = json.load(file, object_pairs_hook=OrderedDict)
+        repetitions = json_file["repetitions"]
+
+    # Find unique runs (without repetitions)
+    all_names = list(filter(lambda x: os.path.isdir(os.path.join(log_dir, x)), all_names))
+    unique_names = list(set(map(lambda x: "_".join(x.split("_")[:-1]), all_names)))
+
+    df = None
+    for run_name in unique_names:
+        params = run_name.split("_")
+        param_names = list(map(lambda x: x.replace("-", ""), json_file["variable_params"].keys()))
+        for repetition in range(repetitions):
+            folder_name = run_name + "_" + str(repetition)
+            folder_contents = os.listdir(os.path.join(log_dir, folder_name))
+            folder_contents = list(filter(lambda x: ".bin" in x, folder_contents))
+            for filename in folder_contents:
+                log = Log(os.path.join(log_dir, folder_name, filename), tags)
+                rank = int(filename.split("_")[-2])
+                epochs = Epochs(log, tags)
+                if df is None:
+                    df = pd.DataFrame(epochs.get_fitness_vs_time_dataframe(), columns=["fitness", "wall clock time", "epoch"])
+                    df["rank"] = rank
+                    df["rep"] = repetition
+                    for param, param_name in zip(params, param_names):
+                        df[param_name] = param
+                else:
+                    df2 = pd.DataFrame(epochs.get_fitness_vs_time_dataframe(), columns=["fitness", "wall clock time", "epoch"])
+                    df2["rank"] = rank
+                    df2["rep"] = repetition
+                    for param, param_name in zip(params, param_names):
+                        df2[param_name] = param
+                    df = df.append(df2, ignore_index=True)
+
+    # Figure out correct file ending
+    if name.endswith(".gz"):
+        file_name = name
+    else:
+        file_name = name + ".gz"
+
+    # Save to disk
+    df.to_csv(file_name, compression="gzip")
+    return df
 
 
 if __name__ == "__main__":
