@@ -6,14 +6,15 @@ import os
 import re
 import struct
 
+
 class Tags(object):
-    '''
+    """
     Represents tag name to id mapping from a header file.
     Preprocessor macros are held in the structure:
         tag_names: Dict<str, int>
     We also reverse index for faster subsequent parsing:
         tag_ids: Dict<int, str>
-    '''
+    """
     def __init__(self, fn: str):
         define = re.compile(r'^\s*#define\s+LOGGING_TAG_(\w+)\s+\(?(\w*?)\)?\s*$')
         self.tag_names = dict()
@@ -35,14 +36,14 @@ class Tags(object):
 
 
 class Log(object):
-    '''
+    """
     Represents a single log file.
         log: List<Tuple<int, int>>
     Also creates a human-readable version with tag names instead of IDs.
     This could hit performance issues for large log files.
     Preferably use IDs instead.
         log_h: List<Tuple<string, int>>
-    '''
+    """
     def __init__(self, fn: str, tags: Tags):
         self.fn = fn
         self.tags = tags
@@ -64,14 +65,15 @@ class Log(object):
         #     print(f'{tag}: {value}')
 
     def check_version(self):
-        ''' Assert logged version matches version from header file '''
+        """
+        Assert logged version matches version from header file
+        """
         try:
             self.version = next(value for (tag, value) in self.log_h if tag == 'version')
-            #print('version', self.version)
         except StopIteration:
             raise ValueError('no version tag found')
         if self.version is not self.tags.tag_names['version']:
-            raise ValueError(f"expected version {self.tags.tag_names['version']}, got {version}")
+            raise ValueError(f"expected version {self.tags.tag_names['version']}, got {self.version}")
 
     def extract_constants(self):
         self.clocks_per_sec = next(value for (tag, value) in self.log_h if tag == 'clocks_per_sec')
@@ -131,10 +133,11 @@ class Log(object):
         durations = [float(d) / self.clocks_per_sec * 1e3 for d in diffs]
         return durations
 
+
 class Epochs(object):
-    '''
+    """
     Represents epochs across one or more logs.
-    '''
+    """
     def __init__(self, log: Log, tags: Tags):
         self.log = log
         self.tags = tags
@@ -188,9 +191,11 @@ def last_log():
     #print(last_log_fn)
     return last_log_fn
 
+
 def logs_in_dir(path):
     log_fns = glob.glob(os.path.join(path, '*_tags.bin'))
     return log_fns
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process GA logs')
