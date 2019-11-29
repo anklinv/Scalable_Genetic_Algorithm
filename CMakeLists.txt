@@ -5,4 +5,6 @@ set(CMAKE_CXX_COMPILER mpicxx)
 
 set(CMAKE_CXX_STANDARD 17)
 
+set(CMAKE_CXX_FLAGS "-O3")
+
 add_executable(Distributed_Genetic_Algorithm main.cpp logging/logging.cpp sequential/travelling_salesman_problem.cpp island/island.cpp)
