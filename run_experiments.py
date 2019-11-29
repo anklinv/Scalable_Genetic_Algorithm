@@ -6,6 +6,7 @@ import argparse
 import itertools
 import datetime
 from shutil import copyfile
+from collections import OrderedDict
 
 default_params = {
     "mode": "sequential",
@@ -92,7 +93,7 @@ if __name__ == "__main__":
             print("Failed to open file {}".format(experiment))
             continue
 
-        experiments = json.load(experiment_file)
+        experiments = json.load(experiment_file, object_pairs_hook=OrderedDict)
         experiment_file.close()
         experiment_name = experiments["name"]
         repetitions = experiments["repetitions"]
