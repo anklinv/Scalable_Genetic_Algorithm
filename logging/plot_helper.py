@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
-from process_log import Tags, Log, Epochs, generate_dataframe
+from process_log import Tags, Log, Epochs, generate_fitness_wc_dataframe
 
 
 def create_barplot(df, ax, nr_bars=10, rnd=-1, ylog=False, thresholds=None):
@@ -59,23 +59,57 @@ def create_barplot(df, ax, nr_bars=10, rnd=-1, ylog=False, thresholds=None):
     chart.set_xticklabels(chart.get_xticklabels(), rotation=90)
 
 
+def create_violinplot(df, ax):
+    # Preprocess dataframe if necessary
+    if "communication time" in df and "computation time" in df and not "time" in df and not "type" in df:
+        comp_df = df.drop(columns="communication time")
+        comp_df = comp_df.rename(columns={"computation time" : "time"})
+        comp_df["type"] = "computation"
+        comm_df = df.drop(columns="computation time")
+        comm_df = comm_df.rename(columns={"communication time" : "time"})
+        comm_df["type"] = "communication"
+        new_df = comp_df.append(comm_df, ignore_index=True)
+    else:
+        new_df = df
+
+    sns.violinplot(x="time", y="type", palette="muted", data=new_df, ax=ax)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Plot GA')
-    parser.add_argument('--dir', dest="dir", help='path to directory with log files or a dataframe')
+    parser.add_argument('--extract', default=False, dest="extract", action="store_true",
+                        help="Whether extract the data frames from the log directory")
+    parser.add_argument('--dir', dest="dir", required=True, help='path to directory with log files or a data frame')
+    parser.add_argument('-n', dest="n", type=int, help="Select the number of islands from the data frame")
+    parser.add_argument('--data', dest="data", type=str, help="Select the data from the data frame")
+    parser.add_argument('--save', dest="save", type=str, help="Save the data to a file name instead of showing")
     args = parser.parse_args()
 
-    if args.dir.endswith(".gz"):
-        print("Loading dataframe... ", end="")
-        df = pd.read_csv("island_scaling_fitness_time.gz")
-        if "Unnamed: 0" in df:
-            df = df.drop(columns="Unnamed: 0")
-        print("Done!")
-    else:
-        print("Creating dataframe... ", end="")
+    if args.extract:
+        print("Creating dataframe... ", end="", flush=True)
         name = os.path.split(args.dir)[1]
-        df = generate_dataframe(args.dir, name)
+        df = generate_fitness_wc_dataframe(args.dir, name)
+        print("Done!")
+        print(f"Saved to {name}.gz")
+    else:
+        print("Loading dataframe... ", end="", flush=True)
+        df = pd.read_csv(args.dir)
         print("Done!")
 
-    fig, ax = plt.subplots()
-    create_barplot(df[df.data == "a280csv"], ax, rnd=-1)
-    plt.show()
+        # Select data
+        if args.n:
+            df = df[df.n == args.n]
+        if args.data:
+            df = df[df.data == args.data]
+
+        fig, ax = plt.subplots()
+        if args.dir.endswith("_periods.gz"):
+            create_violinplot(df, ax)
+        else:
+            create_barplot(df, ax, rnd=-1)
+
+        # show the plot
+        if args.save:
+            fig.savefig(args.save, dpi=300)
+        else:
+            plt.show()
