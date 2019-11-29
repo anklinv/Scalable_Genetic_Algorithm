@@ -230,7 +230,17 @@ def generate_dataframe(log_dir, name, tag_loc="tags.hpp"):
     df = None
     for run_name in unique_names:
         params = run_name.split("_")
-        param_names = list(map(lambda x: x.replace("-", ""), json_file["variable_params"].keys()))
+
+        # Get parameter names
+        param_names = list()
+        for key, val in json_file["variable_params"].items():
+            # Handle tuples
+            if val["type"] == "tuple":
+                param_names.extend(val["names"])
+            else:
+                param_names.append(key)
+        param_names = list(map(lambda x: x.replace("-", ""), param_names))
+
         for repetition in range(repetitions):
             folder_name = run_name + "_" + str(repetition)
             folder_contents = os.listdir(os.path.join(log_dir, folder_name))
