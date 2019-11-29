@@ -225,4 +225,4 @@ if __name__ == "__main__":
                         time.sleep(15)
 
     if args.dry_run:
-        print(f"You are about to schedule {job_count} jobs")
+        print("You are about to schedule {} jobs".format(job_count))
