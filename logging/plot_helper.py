@@ -106,12 +106,34 @@ def create_lineplot(df, ax, resolution=50, rnd=0):
     sns.lineplot(ax=ax, y="fitness", x="wall clock time", hue="n", legend="full", data=line_df)
 
 
+def create_speedup_plot(df, ax, threshold, hue=None):
+    to_keep = ["n", "rep", "epoch"]
+    if hue:
+        to_keep.append(hue)
+    df_n = df.groupby(to_keep, as_index=False).agg({"fitness": "min", "wall clock time": "max"}).drop(columns=["epoch"])
+    to_keep = ["n", "rep"]
+    if hue:
+        to_keep.append(hue)
+    df_reached = df_n[df_n.fitness <= threshold].groupby(to_keep).agg({"wall clock time": "min"})
+    tmp = df_reached.reset_index()
+    baseline = tmp[tmp.n == 1]["wall clock time"].mean()
+    df_speedup = 1 / df_reached.divide(baseline, 1)
+    df_speedup = df_speedup.reset_index()
+    if hue:
+        sns.lineplot(ax=ax, x="n", y="wall clock time", hue=hue, data=df_speedup, legend="full")
+    else:
+        sns.lineplot(ax=ax, x="n", y="wall clock time", data=df_speedup, legend="full")
+    ax.set(xlabel='n', ylabel='speedup')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Plot GA')
     parser.add_argument('--extract', default=False, dest="extract", action="store_true",
                         help="Whether extract the data frames from the log directory")
     parser.add_argument('--bar', default=False, dest="bar", action="store_true",
                         help="Create a bar plot instead of a line plot")
+    parser.add_argument('--speedup', dest="speedup", type=str, default="",
+                        help="Create a speedup plot from the data with given hue parameter")
     parser.add_argument('--dir', dest="dir", required=True, help='path to directory with log files or a data frame')
     parser.add_argument('-n', dest="n", type=int, help="Select the number of islands from the data frame")
     parser.add_argument('--data', dest="data", type=str, help="Select the data from the data frame")
@@ -140,6 +162,13 @@ if __name__ == "__main__":
             create_violinplot(df, ax)
         elif args.bar:
             create_barplot(df, ax, rnd=-1)
+        elif args.speedup != "":
+            # Extract suiting threshold
+            df_n = df.groupby(["n", "rep", "epoch", "migration_period"], as_index=False).agg({"fitness" : "min", "wall clock time" : "max"}).drop(columns=["epoch"])
+            max_fitness = df_n.groupby("n").agg({"fitness" : "max"}).fitness.min()
+            min_fitness = df_n.groupby("n").agg({"fitness" : "min"}).fitness.max()
+            thresholds = np.round(np.linspace(min_fitness, max_fitness, num=10), -1).astype(int)
+            create_speedup_plot(df, ax, threshold=thresholds[-2], hue=args.speedup)
         else:
             create_lineplot(df, ax)
 
