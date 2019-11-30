@@ -19,13 +19,14 @@ using namespace std;
 // Global variables (parameters)
 
 // --epochs
-int nr_epochs = 50000;
+int nr_epochs = 1000;
 
 // --population
-int nr_individuals = 1000;
+int nr_individuals = 128;
 
-// island or sequential
-bool runIsland = false;
+// island or naive or sequential
+//    2        1          0
+int mode = 0;
 
 string data_dir = "data";
 
@@ -36,10 +37,10 @@ string data_file = "a280.csv";
 string log_dir = "logs/";
 
 // --elite_size
-int elite_size = 16;
+int elite_size = 65;
 
 // --mutation
-int mutation = 16;
+int mutation = 10;
 
 // --migration_period
 int migration_period = 200;
@@ -82,12 +83,17 @@ void parse_args(int argc, char** argv, bool verbose_args=false) {
     for (int i = 1; i < argc; ++i) {
         // Single arguments
         if (argv[i] == (string) "sequential") {
-            runIsland = false;
+            mode = 0;
+            if (verbose_args) {
+                cout << "Mode " << argv[i] << endl;
+            }
+        } else if (argv[i] == (string) "naive") {
+            mode = 1;
             if (verbose_args) {
                 cout << "Mode " << argv[i] << endl;
             }
         } else if (argv[i] == (string) "island") {
-            runIsland = true;
+            mode = 2;
             if (verbose_args) {
                 cout << "Mode " << argv[i] << endl;
             }
@@ -181,6 +187,7 @@ void parse_args(int argc, char** argv, bool verbose_args=false) {
             assert(i + 1 < argc);
             try {
                 verbose_args = stoi(argv[i + 1]);
+                verbose = stoi(argv[i + 1]);
             } catch (const std::invalid_argument &e) {
                 cerr << "Invalid integer for " << argv[i] << endl;
                 exit(1);
@@ -324,87 +331,110 @@ int main(int argc, char** argv) {
     // Parse arguments and save in global variables
     parse_args(argc, argv, verbose);
 
-    MPI_Init(&argc, &argv); /* requirement for MPI */
-
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    // Read input
+    // Read problem
     int number_cities = -1;
-    float* node_edge_mat;
+    float *node_edge_mat;
     read_input(number_cities, node_edge_mat);
     assert(number_cities != -1);
 
     // Create problem
     TravellingSalesmanProblem problem(number_cities, node_edge_mat, nr_individuals, elite_size, mutation, verbose);
-    problem.set_logger(new Logger(log_dir, rank));
 
-    // NAIVE PARALLEL MODEL
-    if (not runIsland) {
+    // Sequential version WITHOUT MPI
+    if (mode == 0) {
+        // Start logging
+        problem.set_logger(new Logger(log_dir, 0));
+
         auto start = chrono::high_resolution_clock::now();
-        double final_distance = problem.solve(nr_epochs, rank);
+        double final_distance = problem.solve(nr_epochs, 0);
         if (verbose > 0) {
-            cout << "Final distance is " << final_distance << " (rank " << rank << ")" << endl;
+            cout << "Final distance is " << final_distance << endl;
         }
 
         auto stop = chrono::high_resolution_clock::now();
         auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
         if (verbose > 0) {
-            cout << duration.count() << " ms total runtime (rank " << rank << ")" << endl;
+            cout << duration.count() << " ms total runtime" << endl;
         }
 
-        if (rank != 0) {
+    // Version WTIH MPI
+    } else {
+        MPI_Init(&argc, &argv); /* requirement for MPI */
 
-            // send result to rank 0
-            MPI_Send(&final_distance, 1, MPI_DOUBLE, 0, DATA_TAG, MPI_COMM_WORLD);
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-        } else {
+        // Start logging
+        problem.set_logger(new Logger(log_dir, rank));
 
-            int numProcesses;
-            MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
-
-            double buff;
-
-            vec_d all_dists;
-            all_dists.push_back(final_distance);
-
-            // receive results from all other ranks
-            for (int i = 0; i < numProcesses - 1; i++) {
-
-                MPI_Recv(&buff, 1, MPI_DOUBLE, MPI_ANY_SOURCE, DATA_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-                all_dists.push_back(buff);
-                final_distance = min(buff, final_distance);
-            }
-
-            double mean = computeMean(all_dists);
-            double stddev = computeStdDev(all_dists);
-
+        // NAIVE PARALLEL MODEL
+        if (mode == 1) {
+            auto start = chrono::high_resolution_clock::now();
+            double final_distance = problem.solve(nr_epochs, rank);
             if (verbose > 0) {
-                cout << "Best final distance overall is " << final_distance << endl;
-                cout << "(mean is " << mean << ", std dev is " << stddev << ")" << endl;
+                cout << "Final distance is " << final_distance << " (rank " << rank << ")" << endl;
             }
+
+            auto stop = chrono::high_resolution_clock::now();
+            auto duration = chrono::duration_cast<chrono::milliseconds>(stop - start);
+            if (verbose > 0) {
+                cout << duration.count() << " ms total runtime (rank " << rank << ")" << endl;
+            }
+
+            if (rank != 0) {
+
+                // send result to rank 0
+                MPI_Send(&final_distance, 1, MPI_DOUBLE, 0, DATA_TAG, MPI_COMM_WORLD);
+
+            } else {
+
+                int numProcesses;
+                MPI_Comm_size(MPI_COMM_WORLD, &numProcesses);
+
+                double buff;
+
+                vec_d all_dists;
+                all_dists.push_back(final_distance);
+
+                // receive results from all other ranks
+                for (int i = 0; i < numProcesses - 1; i++) {
+
+                    MPI_Recv(&buff, 1, MPI_DOUBLE, MPI_ANY_SOURCE, DATA_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+                    all_dists.push_back(buff);
+                    final_distance = min(buff, final_distance);
+                }
+
+                double mean = computeMean(all_dists);
+                double stddev = computeStdDev(all_dists);
+
+                if (verbose > 0) {
+                    cout << "Best final distance overall is " << final_distance << endl;
+                    cout << "(mean is " << mean << ", std dev is " << stddev << ")" << endl;
+                }
+            }
+
+        // ISLAND MODEL
+        } else if (mode == 2) {
+
+            Island island(problem, migration_topology, migration_amount,
+                          migration_period, // immigrants RECEIVED per migration, migration period
+                          selection_policy,
+                          replacement_policy,
+                          communication);
+
+            double bestDistance = island.solve(nr_epochs); // number of evolution steps
+            if (verbose > 0) {
+                cout << bestDistance << endl;
+            }
+
         }
 
-    // ISLAND MODEL
-    } else if (runIsland) {
-        
-        Island island(problem, migration_topology, migration_amount, migration_period, // immigrants RECEIVED per migration, migration period
-                      selection_policy,
-                      replacement_policy,
-                      communication);
-        
-        double bestDistance = island.solve(nr_epochs); // number of evolution steps
-        if (verbose > 0) {
-            cout << bestDistance << endl;
-        }
-      
-    } // end runIsland
+        MPI_Finalize(); /* requirement for MPI */
+    }
 
     // Delete cities matrix
-    delete(node_edge_mat);
-
-    MPI_Finalize(); /* requirement for MPI */
+    delete (node_edge_mat);
 
     return 0;
 }
