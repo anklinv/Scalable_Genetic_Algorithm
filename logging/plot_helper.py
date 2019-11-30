@@ -134,6 +134,7 @@ if __name__ == "__main__":
                         help="Create a bar plot instead of a line plot")
     parser.add_argument('--speedup', dest="speedup", type=str, default="",
                         help="Create a speedup plot from the data with given hue parameter")
+    parser.add_argument('--threshold', dest="threshold", type=int, default=0, help='Threshold to use for speedup plot')
     parser.add_argument('--dir', dest="dir", required=True, help='path to directory with log files or a data frame')
     parser.add_argument('-n', dest="n", type=int, help="Select the number of islands from the data frame")
     parser.add_argument('--data', dest="data", type=str, help="Select the data from the data frame")
@@ -163,12 +164,18 @@ if __name__ == "__main__":
         elif args.bar:
             create_barplot(df, ax, rnd=-1)
         elif args.speedup != "":
-            # Extract suiting threshold
-            df_n = df.groupby(["n", "rep", "epoch", "migration_period"], as_index=False).agg({"fitness" : "min", "wall clock time" : "max"}).drop(columns=["epoch"])
-            max_fitness = df_n.groupby("n").agg({"fitness" : "max"}).fitness.min()
-            min_fitness = df_n.groupby("n").agg({"fitness" : "min"}).fitness.max()
-            thresholds = np.round(np.linspace(min_fitness, max_fitness, num=10), -1).astype(int)
-            create_speedup_plot(df, ax, threshold=thresholds[-2], hue=args.speedup)
+            if args.threshold >= 0:
+                threshold = args.threshold
+            else:
+                # Extract suiting threshold
+                df_n = df.groupby(["n", "rep", "epoch", "migration_period"], as_index=False).agg({"fitness": "min", "wall clock time": "max"}).drop(columns=["epoch"])
+                max_fitness = df_n.groupby("n").agg({"fitness" : "max"}).fitness.min()
+                min_fitness = df_n.groupby("n").agg({"fitness" : "min"}).fitness.max()
+                thresholds = np.round(np.linspace(min_fitness, max_fitness, num=10), -1).astype(int)
+                threshold = thresholds[-2]
+
+            # Create plot
+            create_speedup_plot(df, ax, threshold=threshold, hue=args.speedup)
         else:
             create_lineplot(df, ax)
 
