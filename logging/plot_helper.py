@@ -20,9 +20,12 @@ def create_barplot(df, ax, nr_bars=10, rnd=-1, ylog=False, thresholds=None):
         df = df.groupby(to_keep, as_index=False).agg({"fitness" : "min", "wall clock time" : "max"}).drop(columns=["epoch"])
 
     # Calculate start and end of thresholds
-    if "n" in df:
-        max_fitness = df.groupby("n").agg({"fitness" : "max"}).fitness.min()
-        min_fitness = df.groupby("n").agg({"fitness" : "min"}).fitness.max()
+    if "n" in df and "rep" in df:
+        max_fitness = df.groupby(["n", "rep"]).agg({"fitness" : "max"}).fitness.min()
+        min_fitness = df.groupby(["n", "rep"]).agg({"fitness" : "min"}).fitness.max()
+    elif "n" in df:
+        max_fitness = df.groupby(["n"]).agg({"fitness" : "max"}).fitness.min()
+        min_fitness = df.groupby(["n"]).agg({"fitness" : "min"}).fitness.max()
     else:
         max_fitness = df.fitness.max()
         min_fitness = df.fitness.min()
@@ -75,10 +78,40 @@ def create_violinplot(df, ax):
     sns.violinplot(x="time", y="type", palette="muted", data=new_df, ax=ax)
 
 
+def create_lineplot(df, ax, resolution=50, rnd=0):
+    # Aggregate rank information
+    if "rank" in df:
+        new_df = df.groupby(["n", "rep", "epoch"], as_index=False).agg({"fitness": "min", "wall clock time": "max"})
+    else:
+        new_df = df
+
+    # Find wall clock time thresholds
+    max_wct = new_df.groupby(["n", "rep"]).agg({"wall clock time": "max"})["wall clock time"].min()
+    min_wct = new_df.groupby(["n", "rep"]).agg({"wall clock time": "min"})["wall clock time"].max()
+    thresholds = np.round(np.linspace(min_wct, max_wct, num=resolution), rnd).astype(int)
+
+    # Create dataframe to plot
+    line_df = None
+    for threshold in thresholds:
+        tmp_df = new_df[new_df["wall clock time"] >= threshold].groupby(["n", "rep"]).agg({"fitness": "max"})
+        tmp_df["wall clock time"] = threshold
+        tmp_df = tmp_df.reset_index()
+
+        if line_df is None:
+            line_df = tmp_df
+        else:
+            line_df = line_df.append(tmp_df, ignore_index=True)
+
+    # Actually plot it
+    sns.lineplot(ax=ax, y="fitness", x="wall clock time", hue="n", legend="full", data=line_df)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Plot GA')
     parser.add_argument('--extract', default=False, dest="extract", action="store_true",
                         help="Whether extract the data frames from the log directory")
+    parser.add_argument('--bar', default=False, dest="bar", action="store_true",
+                        help="Create a bar plot instead of a line plot")
     parser.add_argument('--dir', dest="dir", required=True, help='path to directory with log files or a data frame')
     parser.add_argument('-n', dest="n", type=int, help="Select the number of islands from the data frame")
     parser.add_argument('--data', dest="data", type=str, help="Select the data from the data frame")
@@ -105,8 +138,10 @@ if __name__ == "__main__":
         fig, ax = plt.subplots()
         if args.dir.endswith("_periods.gz"):
             create_violinplot(df, ax)
-        else:
+        elif args.bar:
             create_barplot(df, ax, rnd=-1)
+        else:
+            create_lineplot(df, ax)
 
         # show the plot
         if args.save:
