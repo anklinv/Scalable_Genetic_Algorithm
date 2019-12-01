@@ -85,10 +85,22 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, flo
     //this->population = new Int[population_count * problem_size];
     
     // start SIMD version
-    this->population = (Int*)aligned_alloc(32, population_count * problem_size * sizeof(Int));
-    this->temp_population = (Int*)aligned_alloc(32, population_count * problem_size * sizeof(Int));
+    
+    /*
+     Allocate size bytes of uninitialized storage whose alignment is specified by alignment.
+     The size parameter must be an integral multiple of alignment.
+     */
+    
+    int correctedSize = population_count * problem_size * sizeof(Int);
+    correctedSize = correctedSize - correctedSize % 32 + 32;
+    this->population = (Int*)aligned_alloc(32, correctedSize);
+    correctedSize = population_count * problem_size * sizeof(Int);
+    correctedSize = correctedSize - correctedSize % 32 + 32;
+    this->temp_population = (Int*)aligned_alloc(32, correctedSize);
     //this->mask = (Int*)aligned_alloc(32, problem_size*sizeof(*mask));
-    this->fitness = (Real*)aligned_alloc(32, population_count * sizeof(Real));
+    correctedSize = population_count * sizeof(Real);
+    correctedSize = correctedSize - correctedSize % 32 + 32;
+    this->fitness = (Real*)aligned_alloc(32, correctedSize);
     // end SIMD version
     
     this->evolutionCounter = 0;
@@ -329,19 +341,20 @@ void TravellingSalesmanProblem::rank_individuals() {
     // TODO: profiling part
     
     
-    this->fitness_sum = 0.0;
+    /*this->fitness_sum = 0.0;
     this->fitness_best = MAX_REAL;
     
     // min over range can be done efficiently using SIMD
     // sum of range can be done efficiently using SIMD
     // could even unroll loop to break sequential debendencies of "+"
     
-    /*for (int i = 0; i < this->population_count; ++i) {
+    for (int i = 0; i < this->population_count; ++i) {
         double new_fitness = this->evaluate_fitness(i);
         this->fitness[i] = new_fitness;
         this->fitness_sum += new_fitness;
         this->fitness_best = min((double)this->fitness_best, (double)new_fitness);
     }*/
+    
     
     // TODO: begin SIMD version
     Real sumFitness = 0.0; // results to compute
@@ -353,24 +366,23 @@ void TravellingSalesmanProblem::rank_individuals() {
     
     
     int fitnessIdx = 0;
-    
+        
     for (; fitnessIdx <= this->population_count - 8; fitnessIdx = fitnessIdx + 8) {
         
         // 8-fold unrolling
         // make sure execution units are busy
-        
-        fitnessSegSIMD = _mm256_load_ps(&fitness[fitnessIdx]);
+        fitnessSegSIMD = _mm256_load_ps(&(this->fitness[fitnessIdx]));
         
         sumSIMD = _mm256_add_ps(sumSIMD, fitnessSegSIMD);
         minSIMD = _mm256_min_ps(minSIMD, fitnessSegSIMD);
     }
-    
+        
     for(; fitnessIdx < this->population_count; fitnessIdx++) { // finish of residual
         sumFitness += fitness[fitnessIdx];
         minFitness = min((double)minFitness,
                          (double)fitness[fitnessIdx]); // because min(.) compares doubles
     }
-    
+        
     // compute horizontal sum
     sumSIMD = _mm256_hadd_ps(sumSIMD, sumSIMD); // sums of 2 candidates
     sumSIMD = _mm256_hadd_ps(sumSIMD, sumSIMD); // sums of 4 candidates
@@ -394,8 +406,13 @@ void TravellingSalesmanProblem::rank_individuals() {
     
     //assertm(abs((sumFitness - this->fitness_sum) / this->fitness_sum) < 1e-5, "fitness sum incorrect");
     //assertm(abs(minFitness - this->fitness_best) < 1e-5, "fitness min incorrect");
+        
+    this->fitness_best = minFitness;
+    this->fitness_sum = sumFitness;
     
     // TODO: end SIMD version
+    
+    //cout << "after segfault" << endl;
     
     // TODO: profiling part
     tEnd = myClock.now();
