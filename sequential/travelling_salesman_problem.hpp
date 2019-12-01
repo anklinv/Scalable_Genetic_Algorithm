@@ -18,7 +18,7 @@ typedef std::vector<int> vi;
 typedef std::chrono::high_resolution_clock hrClock;
 typedef std::chrono::time_point<hrClock> hrTime;
 
-typedef std::chrono::microseconds hrMillies;
+typedef std::chrono::nanoseconds hrNanos;
 
 
 struct City {
@@ -59,7 +59,7 @@ public:
     /// Solve the problem by evolving for a given number of steps.
     /// \param nr_epochs number of steps to evolve
     /// \return the best length of the best path found by the algorithm
-    double solve(int nr_epochs, int rank);
+    Real solve(int nr_epochs, int rank);
     
     
     /// Getter method to access the ranks after execution of the algorithm. For Island.
@@ -69,13 +69,13 @@ public:
     Int* getGenes();
     
     /// Getter method to access the fitness of a single individual. For Island.
-    double getFitness(int indivIdx);
+    Real getFitness(int indivIdx);
     
     /// Setter method to set the fitness of a single individual. For Island.
-    void setFitness(int indivIdx, double newFitness);
+    void setFitness(int indivIdx, Real newFitness);
     
     /// Returns the minimum (best) fitness value. For Island.
-    double getMinFitness();
+    Real getMinFitness();
     
     
     /// Getter method to access the "gene" of a single individual (??)
@@ -88,11 +88,16 @@ private:
 
     /// Pointer to the population indices, which has size population_count * problem_size
     Int* population;
+    
+    /// Pointer to the indices of the temporary population, size population_count * problem_size, used during breed population
+    Int* temp_population;
+    /// Used during breed
+    Int* mask;
 
     /// Fitness of individuals. i-th element is the path length of i-th individual
-    vector<double> fitness;
-    double fitness_sum;
-    double fitness_best;
+    Real* fitness;
+    Real fitness_sum;
+    Real fitness_best;
 
     /// Sorted ranks of individuals. i-th element is the index of the i-th best individual
     int* ranks;
@@ -110,7 +115,7 @@ private:
     /// Calculate the fitness of an individual, which is the length of the closed path in the graph and return it.
     /// \param index of individual
     /// \return the length of the path in the graph
-    double evaluate_fitness(int individual);
+    Real evaluate_fitness(int individual);
 
     /// Run a single iteration of selection, breeding and mutation
     void evolve(int rank);
