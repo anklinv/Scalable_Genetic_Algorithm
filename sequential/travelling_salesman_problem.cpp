@@ -458,73 +458,89 @@ void TravellingSalesmanProblem::rank_individuals() {
 
 Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     
-    // size of this part of the working set in memory is:
+    // size of this part of the working set is:
     // sizeof(Real) * problem_size * problem_size
     
+    
     // TODO: begin SIMD version
+    const int INC_GENE = (256 / 8) / sizeof(Int); // bytes
+    
     Real sumDistance = 0;
-    
-    __m256 problemSizeSIMD = _mm256_set1_epi32(problem_size);
-    
     __m256 sumDistanceSIMD = _mm256_set1_ps(0);
-    __m256 distancesSIMD;
     
+    // indices for distance matrix lookup
     __m256i geneSegSIMD;
     __m256i geneSegShiftedSIMD;
     
+    const __m256 PROBLEM_SIZE_SIMD = _mm256_set1_epi32(problem_size);
+    
+    __m256 offsetSIMD;
+    
+    // distances of the current gene segment
+    // (8 indices means 7 distances)
+    // ok ok ok ok ok ok ok garbage
+    __m256 distancesSIMD;
+    
+    __m256i geneSegIdx3MaskSIMD = _mm256_set_epi32(0, 0, 0, 0xFFFFFFFF, 0, 0, 0, 0);
+    
     int geneIdx = 0;
-    for(; geneIdx <= problem_size - 8; geneIdx = geneIdx + 8) {
+    
+    for(; geneIdx <= (problem_size - 8); geneIdx = geneIdx + (INC_GENE - 1)) {
         
         geneSegSIMD = _mm256_load_si256((__m256i *)&POP(individual, geneIdx));
         
-        // bit shift to left
-        // & duplication (one will overlap treat this sep with extract)
-        
-        int tmp = _mm256_extract_epi32(geneSegSIMD, 4);
+        // shift 128-bit lanes to the left by 32 bit
+        // 7 6 5 4 3 2 1 0 => 6 5 4 x 2 1 0 x (x padded with zeros)
+        // use extract to recover 3
+        int geneSegIdx3 = _mm256_extract_epi32(geneSegSIMD, 3);
         
         geneSegShiftedSIMD = _mm256_slli_si256(geneSegSIMD, 32);
-        // shift 128-bit lanes to the left by 32 bit
         
-        __m256i tmpSIMD = _mm256_set1_epi32(tmp);
-        __m256i tmpMaskSIMD = _mm256_set_epi32(0, 0, 0, 0xFFFFFFFF, 0, 0, 0, 0);
+        __m256i geneSegIdx3SIMD = _mm256_set1_epi32(geneSegIdx3);
+        geneSegIdx3SIMD = _mm256_and_si256(geneSegIdx3SIMD, geneSegIdx3MaskSIMD);
         
-        tmpSIMD = _mm256_and_si256(tmpSIMD, tmpMaskSIMD);
+        geneSegShiftedSIMD = _mm256_or_si256(geneSegShiftedSIMD, geneSegIdx3SIMD);
         
-        // reinsert somehow
-        // maybe set mask and
-        geneSegShiftedSIMD = _mm256_or_si256(geneSegShiftedSIMD, tmpSIMD);
-        
-        // now we are fine like
-        // 6 5 4 3 2 1 0 x geneSegShiftedSIMD (x is filled with zeros)
+        // now we have like like
+        // 6 5 4 3 2 1 0 x geneSegShiftedSIMD (x padded with zeros)
         // 7 6 5 4 3 2 1 0 geneSegSIMD
         
-        __m256 distanceIndicesSIMD = _mm256_mullo_epi32(geneSegShiftedSIMD, problemSizeSIMD); // super slow
-        // if the loop is unrolled 3-fold can use cast to ps, ps mul, cast to epi32
-        distanceIndicesSIMD = _mm256_add_epi32(distanceIndicesSIMD, geneSegSIMD);
-                
-        // simultaneous load of distances
-        _mm256_i32gather_epi32(cities, distanceIndicesSIMD, 4);
+        offsetsSIMD = _mm256_mullo_epi32(geneSegShiftedSIMD, PROBLEM_SIZE_SIMD); // super slow
+        offsetsSIMD = _mm256_add_epi32(offsetSIMD, geneSegSIMD);
+        
+        // make sure cities is aligned to 32 in memory
+        distancesSIMD = _mm256_i32gather_epi32(cities, offsetsSIMD, 4);
         
         // 6-7 5-6 4-5 3-4 2-3 1-2 0-1 x
         
         // simultaneous add to SIMD sum
         sumDistanceSIMD = _mm256_add_ps(sumDistanceSIMD, distancesSIMD);
-        
-        // ok ok ok ok ok ok ok garbage
-        // (use mask at the end to eliminate garbage)
     }
     
-    __m256i eliminateSIMD = _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0);
+    // ok ok ok ok ok ok ok garbage
+    // (use mask to eliminate garbage)
+    __m256i garbageMaskSIMD = _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+                                             0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0);
+    sumDistanceSIMD = _mm256_and_si256(sumDistanceSIMD, garbageMaskSIMD);
+        
+    // compute horizontal sum
+    sumSIMD = _mm256_hadd_ps(sumSIMD, sumSIMD); // sums of 2 candidates
+    sumSIMD = _mm256_hadd_ps(sumSIMD, sumSIMD); // sums of 4 candidates
     
-    sumDistanceSIMD = _mm256_and_si256(sumDistanceSIMD, eliminateSIMD);
+    Real sumLowH = _mm256_cvtss_f32(sumSIMD);
+    sumDistance += sumLowH;
     
-    // do accumulation
+    Real sumHighH = _mm256_cvtss_f32(_mm256_permute2f128_ps(sumSIMD, sumSIMD, 1));
+    sumDistance += sumHighH;
     
-    // finish off with scalar loop
-    
+    // scalar loop for residual
+    for(; geneIdx < (problem_size - 1); geneIdx++) {
+        sumDistance += DIST(POP(individual, geneIdx), POP(individual, geneIdx + 1));
+    }
     // TODO: end SIMD version
     
     
+    // TODO: start sequential version
     Real route_distance = 0.0;
     
     for (int j = 0; j < this->problem_size - 1; ++j) {
@@ -538,6 +554,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     VAL_POP(individual, 0);
     VAL_DIST(POP(individual, this->problem_size - 1), POP(individual, 0));
     route_distance += DIST(POP(individual, this->problem_size - 1), POP(individual, 0)); //complete the round trip
+    // TODO: end sequential version
     
     return route_distance;
 }
