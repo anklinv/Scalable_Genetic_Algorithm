@@ -8,7 +8,6 @@
 
 using namespace std;
 
-<<<<<<< HEAD
 
 /*
  For microbenchmarking.
@@ -19,11 +18,9 @@ typedef std::vector<int> vi;
 typedef std::chrono::high_resolution_clock hrClock;
 typedef std::chrono::time_point<hrClock> hrTime;
 
-typedef std::chrono::nanoseconds hrNanos;
+typedef std::chrono::microseconds hrMillies;
 
 
-=======
->>>>>>> parent of 640d84e... added sequential optimizations
 struct City {
     double x, y;
 };
@@ -36,7 +33,7 @@ public:
     /// \param population_count size of the population
     /// \param elite_size number of individuals that survive for sure
     /// \param mutation_rate 1/mutation_rate is the probability that an individual gets a mutation
-    TravellingSalesmanProblem(int problem_size, Real* cities, int population_count, int elite_size, int mutation_rate, int verbose);
+    TravellingSalesmanProblem(int problem_size, float* cities, int population_count, int elite_size, int mutation_rate, int verbose);
     ~TravellingSalesmanProblem();
 
     /// For debug printing
@@ -55,30 +52,30 @@ public:
     int mutation_rate;
 
     /// 2D coordinates of the cities
-    Real* cities;
+    float* cities;
 
     void set_logger(Logger *_logger);
 
     /// Solve the problem by evolving for a given number of steps.
     /// \param nr_epochs number of steps to evolve
     /// \return the best length of the best path found by the algorithm
-    Real solve(int nr_epochs, int rank);
+    double solve(int nr_epochs, int rank);
     
     
     /// Getter method to access the ranks after execution of the algorithm. For Island.
     int* getRanks();
     
     /// Getter method to access the genes of the individuals of the population. For Island.
-    int* getGenes();
+    Int* getGenes();
     
     /// Getter method to access the fitness of a single individual. For Island.
-    Real getFitness(int indivIdx);
+    double getFitness(int indivIdx);
     
     /// Setter method to set the fitness of a single individual. For Island.
-    void setFitness(int indivIdx, Real newFitness);
+    void setFitness(int indivIdx, double newFitness);
     
     /// Returns the minimum (best) fitness value. For Island.
-    Real getMinFitness();
+    double getMinFitness();
     
     
     /// Getter method to access the "gene" of a single individual (??)
@@ -90,22 +87,12 @@ private:
     Logger *logger;
 
     /// Pointer to the population indices, which has size population_count * problem_size
-<<<<<<< HEAD
     Int* population;
-    
-    /// Pointer to the indices of the temporary population, size population_count * problem_size, used during breed population
-    Int* temp_population;
-    
-    /// Used during breed
-    Int* mask;
-=======
-    int* population;
->>>>>>> parent of 640d84e... added sequential optimizations
 
     /// Fitness of individuals. i-th element is the path length of i-th individual
-    Real* fitness;
-    Real fitness_sum;
-    Real fitness_best;
+    vector<double> fitness;
+    double fitness_sum;
+    double fitness_best;
 
     /// Sorted ranks of individuals. i-th element is the index of the i-th best individual
     int* ranks;
@@ -123,7 +110,7 @@ private:
     /// Calculate the fitness of an individual, which is the length of the closed path in the graph and return it.
     /// \param index of individual
     /// \return the length of the path in the graph
-    Real evaluate_fitness(int individual);
+    double evaluate_fitness(int individual);
 
     /// Run a single iteration of selection, breeding and mutation
     void evolve(int rank);
@@ -137,7 +124,7 @@ private:
     /// \param parent1 index of mother of the child
     /// \param parent2 index of father of the child
     /// \param child mix of mother and father
-    void breed(int parent1, int parent2, int* child);
+    void breed(int parent1, int parent2, Int* child);
 
     /// Apply breeding to the whole population by taking random individuals and breeding them. Make sure that all elite
     /// members stay unchanged.

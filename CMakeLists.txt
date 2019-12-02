@@ -5,14 +5,10 @@ set(CMAKE_CXX_COMPILER mpicxx)
 
 set(CMAKE_CXX_STANDARD 17)
 
-<<<<<<< HEAD
 cmake_minimum_required(VERSION 3.15)
 
-SET(CMAKE_CXX_FLAGS  "-mavx2 -mbmi2 -O3 -funroll-loops")
+SET(CMAKE_CXX_FLAGS  "-mavx2 -O3 -funroll-loops")
 
-add_definitions(-D Int=int -D Real=float -D microbenchmark_breed)
-#[[ currently only Real={float} and Int={uint16_t, uint32_t, int} are supported ]]
+add_definitions(-D Int=uint16_t -D microbenchmark_breed)
 
-=======
->>>>>>> parent of 640d84e... added sequential optimizations
 add_executable(Distributed_Genetic_Algorithm main.cpp logging/logging.cpp sequential/travelling_salesman_problem.cpp island/island.cpp)
