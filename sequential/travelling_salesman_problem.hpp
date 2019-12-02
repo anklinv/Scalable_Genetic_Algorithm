@@ -53,7 +53,7 @@ public:
     int* getRanks();
     
     /// Getter method to access the genes of the individuals of the population. For Island.
-    int* getGenes();
+    Int* getGenes();
     
     /// Getter method to access the fitness of a single individual. For Island.
     double getFitness(int indivIdx);
@@ -74,7 +74,7 @@ private:
     Logger *logger;
 
     /// Pointer to the population indices, which has size population_count * problem_size
-    int* population;
+    Int* population;
 
     /// Fitness of individuals. i-th element is the path length of i-th individual
     vector<double> fitness;
@@ -111,7 +111,7 @@ private:
     /// \param parent1 index of mother of the child
     /// \param parent2 index of father of the child
     /// \param child mix of mother and father
-    void breed(int parent1, int parent2, int* child);
+    void breed(int parent1, int parent2, Int* child);
 
     /// Apply breeding to the whole population by taking random individuals and breeding them. Make sure that all elite
     /// members stay unchanged.

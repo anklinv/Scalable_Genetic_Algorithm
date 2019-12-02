@@ -7,17 +7,34 @@ import numpy as np
 from process_log import Tags, Log, Epochs, generate_fitness_wc_dataframe
 
 
-def create_barplot(df, ax, nr_bars=10, rnd=-1, ylog=False, thresholds=None):
+def create_barplot(df, ax, hue="n", nr_bars=10, rnd=-1, ylog=False, thresholds=None):
     assert "fitness" in df, "Fitness not in dataframe"
     assert "wall clock time" in df, "Wall clock time not in dataframe"
+    assert hue in df, "Hue not in dataframe"
 
-    if "rank" in df:
+
+    if "rank" in df: # do aggregation over ranks
+
         to_keep = ["epoch"]
         if "n" in df:
             to_keep.append("n")
         if "rep" in df:
-            to_keep.append("rep")
-        df = df.groupby(to_keep, as_index=False).agg({"fitness" : "min", "wall clock time" : "max"}).drop(columns=["epoch"])
+            to_keep.append("rep") # used for confidence interval
+
+        if hue in df:
+            to_keep.append(hue)
+
+
+        if "epoch" in df:
+            df = df.drop(columns=["epoch"])
+
+
+        df = df.groupby(to_keep, as_index=False)
+
+        # at max wall clock time min fitness was reached for sure
+        # it is at max wall clock time when the result of an epoch is known
+        df = df.agg({"fitness" : "min", "wall clock time" : "max"})
+
 
     # Calculate start and end of thresholds
     if "n" in df and "rep" in df:
@@ -38,7 +55,7 @@ def create_barplot(df, ax, nr_bars=10, rnd=-1, ylog=False, thresholds=None):
     if "n" in df:
         to_keep = ["rep", "n"]
     else:
-        to_keep = ["rep"]
+        to_keep = ["rep", hue]
 
     # Generate dataframe for plotting
     plot_df = None
