@@ -354,8 +354,8 @@ void TravellingSalesmanProblem::rank_individuals() {
     tStart = myClock.now();
     // TODO: profiling part
     
-    
-    this->fitness_sum = 0.0;
+    // TODO: begin scalar version
+    /*this->fitness_sum = 0.0;
     this->fitness_best = MAX_REAL;
     
     // min over range can be done efficiently using SIMD
@@ -367,11 +367,15 @@ void TravellingSalesmanProblem::rank_individuals() {
         this->fitness[i] = new_fitness;
         this->fitness_sum += new_fitness;
         this->fitness_best = min((double)this->fitness_best, (double)new_fitness);
-    }
-    
+    }*/
+    // TODO: end scalar version
     
     // TODO: begin SIMD version
-    /*Real sumFitness = 0.0; // results to compute
+    for(int indivIdx = 0; indivIdx < population_count; indivIdx++) {
+        fitness[indivIdx] = evaluate_fitness(indivIdx);
+    }
+    
+    Real sumFitness = 0.0; // results to compute
     Real minFitness = MAX_REAL;
     
     __m256 fitnessSegSIMD;
@@ -422,8 +426,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     //assertm(abs(minFitness - this->fitness_best) < 1e-5, "fitness min incorrect");
         
     this->fitness_best = minFitness;
-    this->fitness_sum = sumFitness;*/
-    
+    this->fitness_sum = sumFitness;
     // TODO: end SIMD version
     
     //cout << "after segfault" << endl;
@@ -550,6 +553,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     for(; geneIdx < (problem_size - 1); geneIdx++) {
         sumDistances += DIST(POP(individual, geneIdx), POP(individual, geneIdx + 1));
     }
+    sumDistances += DIST(POP(individual, problem_size-1), POP(individual, 0)); // round trip
     return sumDistances;
     // TODO: end SIMD version
     
@@ -568,12 +572,12 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     VAL_POP(individual, 0);
     VAL_DIST(POP(individual, this->problem_size - 1), POP(individual, 0));
     
+    route_distance += DIST(POP(individual, this->problem_size - 1), POP(individual, 0)); //complete the round trip
+    
     //assertm(sumDistances == route_distance, "computed distance is not correct");
     
-    route_distance += DIST(POP(individual, this->problem_size - 1), POP(individual, 0)); //complete the round trip*/
+    return route_distance;*/
     // TODO: end sequential version
-    
-    //return route_distance;
 }
 
 
