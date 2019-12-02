@@ -91,6 +91,7 @@ private:
     
     /// Pointer to the indices of the temporary population, size population_count * problem_size, used during breed population
     Int* temp_population;
+    
     /// Used during breed
     Int* mask;
 

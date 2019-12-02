@@ -10,6 +10,8 @@
 #include <immintrin.h> // for SIMD
 #include <fstream> // for writing CSV files
 #include <stdlib.h> // for aligned alloc
+#include <bitset> // for debugging
+#include <iomanip>
 #include "travelling_salesman_problem.hpp"
 
 #define SAFE_DEBUG
@@ -70,7 +72,9 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, flo
     this->mutation_rate = mutation_rate;
     //this->fitness = vector<double>(population_count, 0.0);
     this->ranks = new int[population_count];
+    // TODO: this is also quite a chunk of data
     this->cities = cities;
+    // TODO: this is also quite a chunk of data
     random_device rd;
     this->gen = mt19937(rd());
 
@@ -84,20 +88,28 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, flo
     // TODO: make this nicer
     //this->population = new Int[population_count * problem_size];
     
+    
+    
+    //cout << std::hex; // TODO: remove this
+    
     // start SIMD version
     
     /*
      Allocate size bytes of uninitialized storage whose alignment is specified by alignment.
      The size parameter must be an integral multiple of alignment.
      */
-    
     int correctedSize = population_count * problem_size * sizeof(Int);
     correctedSize = correctedSize - correctedSize % 32 + 32;
     this->population = (Int*)aligned_alloc(32, correctedSize);
+    
     correctedSize = population_count * problem_size * sizeof(Int);
     correctedSize = correctedSize - correctedSize % 32 + 32;
     this->temp_population = (Int*)aligned_alloc(32, correctedSize);
-    //this->mask = (Int*)aligned_alloc(32, problem_size*sizeof(*mask));
+    
+    correctedSize = problem_size * sizeof(Int); // mask is Int
+    correctedSize = correctedSize - correctedSize % 32 + 32;
+    this->mask = (Int*)aligned_alloc(32, correctedSize);
+    
     correctedSize = population_count * sizeof(Real);
     correctedSize = correctedSize - correctedSize % 32 + 32;
     this->fitness = (Real*)aligned_alloc(32, correctedSize);
@@ -144,13 +156,12 @@ TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     cout << "mean runtime split (ns): (total runtime " << accSplit << "s)" << endl;
     cout << (double)accumulate(splitRuntimes.begin(), splitRuntimes.end(), 0)/numCrossovers << endl;
     
-    cout << "(total runtime rnd+chunk+split: " << accRnd+accChunk+accSplit << ")" << endl;
-    
     double accSumAndMin = (double)accumulate(sumAndMinRuntimes.begin(), sumAndMinRuntimes.end(), 0) / (double)1e9;
     double accSort = (double)accumulate(sortRuntimes.begin(), sortRuntimes.end(), 0) / (double)1e9;
     
     cout << "accumulated runtime rank: " << accRuntimeRank / (double)1e9 << "s" << endl;
     cout << "accumulated runtime breed: " << accRuntimeBreed / (double)1e9 << "s" << endl;
+    cout << "(total runtime rnd+chunk+split: " << accRnd+accChunk+accSplit << ")" << endl;
     cout << "accumulated runtime mutate: " << accRuntimeMutate / (double)1e9 << "s" << endl;
     
     cout << "--------------------------" << endl;
@@ -193,7 +204,7 @@ TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     // start SIMD
     delete this->population;
     delete this->temp_population;
-    //delete this->mask;
+    delete this->mask;
     delete this->fitness;
     // end SIMD
     
@@ -341,7 +352,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     // TODO: profiling part
     
     
-    /*this->fitness_sum = 0.0;
+    this->fitness_sum = 0.0;
     this->fitness_best = MAX_REAL;
     
     // min over range can be done efficiently using SIMD
@@ -353,11 +364,11 @@ void TravellingSalesmanProblem::rank_individuals() {
         this->fitness[i] = new_fitness;
         this->fitness_sum += new_fitness;
         this->fitness_best = min((double)this->fitness_best, (double)new_fitness);
-    }*/
+    }
     
     
     // TODO: begin SIMD version
-    Real sumFitness = 0.0; // results to compute
+    /*Real sumFitness = 0.0; // results to compute
     Real minFitness = MAX_REAL;
     
     __m256 fitnessSegSIMD;
@@ -393,7 +404,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     Real sumHighH = _mm256_cvtss_f32(_mm256_permute2f128_ps(sumSIMD, sumSIMD, 1));
     sumFitness += sumHighH;
     
-    // compute horizontl min
+    // compute horizontal min
     __m256 minPermSIMD = _mm256_permute2f128_ps(minSIMD, minSIMD, 0x11);
     minSIMD = _mm256_min_ps(minSIMD, minPermSIMD); // lower half contains 4 candidates
     minPermSIMD = _mm256_shuffle_ps(minSIMD, minSIMD, _MM_SHUFFLE(1, 0, 3, 2)); // _MM_SHUFFLE(1, 0, 3, 2) 0b01001110
@@ -408,7 +419,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     //assertm(abs(minFitness - this->fitness_best) < 1e-5, "fitness min incorrect");
         
     this->fitness_best = minFitness;
-    this->fitness_sum = sumFitness;
+    this->fitness_sum = sumFitness;*/
     
     // TODO: end SIMD version
     
@@ -423,6 +434,11 @@ void TravellingSalesmanProblem::rank_individuals() {
     // TODO: profiling part
     
     iota(this->ranks, this->ranks + this->population_count, 0); // fill with ascending values
+    
+    // maybe use "in-place" sort
+    // hpc library for sorting or similar
+    
+    // maybe the simd library thing?
     
     sort(this->ranks, this->ranks + this->population_count, [this] (int i, int j) { // sort according to fitness
        return this->fitness[i] < this->fitness[j];
@@ -452,61 +468,26 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     return route_distance;
 }
 
+
+void print256_bitset(__m256i var) {
+    
+    uint32_t *val = (uint32_t*) &var;
+    
+    cout << val[0] << " " << val[1] << " "
+        << val[2] << " " << val[3] << " "
+        << val[4] << " " << val[5] << " "
+        << val[6] << " " << val[7] << endl;
+}
+
 //this function takes up the most time in an epoch
 //possible solutions:
 //  * take 50% of each parent as opposed to randomly taking a sequence
 //  *
 void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int* child) {
     
-    // start SIMD
-    // TODO: make sure child is aligned to 32
-    // end SIMD
     
     bool useSIMD = false;
-    
-    
     if (useSIMD) {
-        
-        // TODO: align population
-        
-        // TODO: sample multiple random integers 2x
-        // TODO: use min, max
-        // leave this out for the moment as it seems to be much effort
-        int geneA = this->rand_range(0, this->problem_size - 1);
-        int geneB = this->rand_range(0, this->problem_size - 1);
-        int startGene = min(geneA, geneB);
-        int endGene = max(geneA, geneB);
-        
-        // peel
-        int idx = startGene;
-        while(idx % 8 != 0 && idx <= endGene) {
-            child[idx] = this->population[parent1*this->problem_size + idx];
-            
-            idx = idx + 1;
-        }
-        // chunks
-        __m256i simdChunk;
-        while(idx+8 <= endGene) {
-            simdChunk = _mm256_load_si256((__m256i *)&(this->population[parent1]));
-            _mm256_store_si256 ((__m256i *)&child[idx], simdChunk);
-            
-            idx = idx + 8;
-        }
-        // peel
-        while(idx <= endGene) {
-            child[idx] = this->population[parent1*this->problem_size + idx];
-            
-            idx = idx + 1;
-        }
-        
-        
-                
-        // TODO: extract subarray
-        // masking maybe?
-        
-        // TODO: extract disjoint indices
-        
-        
     } else {
         
         bool useSet = false;
@@ -538,62 +519,146 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
              Experiment with mask.
              */
             
-            int mask[problem_size]; // size of a single individual
+            // TODO: start sequential version
+            /*int mask[problem_size]; // size of a single individual
             for(int idx = 0; idx < problem_size; idx++) {
-                mask[idx] = 0xFFFF;
-            }
+                mask[idx] = 1;
+            }*/
             // cities are indexed 0, ..., (problem_size-1)
+            // TODO: end sequential version
             
-            // start SIMD version
+            // TODO: start SIMD version
+            // compute how many mask elements are covered by a __m256i
+            const int INC_MASK = (256 / 8) / sizeof(Int); // bytes
             
-            // avx2 needs array addresses aligned to 32
-            
-            /*int ones = 0xFFFF; // broadcast 0xFFFF to eight 32-bit integers
-            __m256i onesSIMD = _mm256_set1_epi32(ones);
+            const __m256i ALL_BITS_SET_SIMD = _mm256_set1_epi32(0xFFFFFFFF);
             
             int maskIdx;
-            for(maskIdx = 0; maskIdx <= problem_size - 8; maskIdx = maskIdx + 8) {
-                _mm256_store_si256((__m256i *)&mask[maskIdx], onesSIMD);
+            for(maskIdx = 0; maskIdx <= problem_size - INC_MASK; maskIdx = maskIdx + INC_MASK) {
+                _mm256_store_si256((__m256i *)(&mask[maskIdx]), ALL_BITS_SET_SIMD);
             }
+            
+            Int ALL_BITS_SET;
+            if(sizeof(Int) == 2) ALL_BITS_SET = 0xFFFF; // 0xFFFF for 16-bit integers
+            else if(sizeof(Int) == 4) ALL_BITS_SET = 0xFFFFFFFF; // 0xFFFFFFFF for 32-bit integers
             
             for(; maskIdx < problem_size; maskIdx++) {
-                mask[maskIdx] = ones;
-            }*/
-            // end SIMD version
+                mask[maskIdx] = ALL_BITS_SET;
+            }
+            // TODO: end SIMD version
             
-            
-            for (int i = startGene; i <= endGene; ++i) {
+            // TODO: start sequential version
+            /*for (int i = startGene; i <= endGene; ++i) {
+                // when running this version it is super important to use the
+                // local mask array
                 child[i] = POP(parent1, i);
                 //assertm(0 <= POP(parent1, i) && POP(parent1, i) <= problem_size-1, "segfault mask, loop chunk");
-                //assertm(mask[POP(parent1, i)] == 1, "gene part is already masked, loop chunk");
-                mask[POP(parent1, i)] = 0x0000; // no comparisons
-            }
-            
-            // start SIMD version
-            /*int zeros = 0x0000;
-            __m256i zerosSIMD = _mm256_set1_epi32(zeros);
-            
-            int geneIdx;
-            __m256i geneSegSIMD;
-            for(geneIdx = startGene; geneIdx <= (endGene - 7); geneIdx = geneIdx + 8) {
-                // by (endGene - 7) we also take endGene
-                
-                // TODO: genes are in general not "int" data type
-                // this will overshoot and maybe do other bad things
-                geneSegSIMD = _mm256_load_si256((__m256i *)
-                                    &(this->population[parent1*problem_size + geneIdx]));
-                _mm256_store_si256((__m256i *)child[geneIdx], geneSegSIMD);
-                
-                _mm256_store_si256(&mask[geneIdx], zerosSIMD);
-            }
-            
-            Int tmp;
-            for(; geneIdx <= endGene; geneIdx++) {
-                tmp = this->population[parent1*problem_size + geneIdx];
-                child[geneIdx] = tmp;
-                mask[tmp] = zeros;
+                //assertm(mask[POP(parent1, i)] == 0xFFFFFFFF, "gene part is already masked, loop chunk");
+                mask[POP(parent1, i)] = 0x00000000;
             }*/
-            // end SIMD version
+            // TODO: end sequential version
+            
+            // TODO: start SIMD version
+            if(sizeof(Int) == 4) {
+                
+                const int ALL_BITS_ZERO = 0x00000000;
+                
+                __m256i geneSegSIMD;
+                
+                int geneIdx;
+                
+                for(geneIdx = startGene; geneIdx <= (endGene - 7); geneIdx = geneIdx + 8) {
+                    // with (endGene - 7) we also take endGene
+                    
+                    geneSegSIMD = _mm256_load_si256((__m256i *)&POP(parent1, geneIdx));
+                    
+                    _mm256_store_si256((__m256i *)&child[geneIdx], geneSegSIMD);
+                    
+                    // extract - store
+                    int geneSegIdx0 = _mm256_extract_epi32(geneSegSIMD, 0);
+                    mask[geneSegIdx0] = ALL_BITS_ZERO;
+                    int geneSegIdx1 = _mm256_extract_epi32(geneSegSIMD, 1);
+                    mask[geneSegIdx1] = ALL_BITS_ZERO;
+                    int geneSegIdx2 = _mm256_extract_epi32(geneSegSIMD, 2);
+                    mask[geneSegIdx2] = ALL_BITS_ZERO;
+                    int geneSegIdx3 = _mm256_extract_epi32(geneSegSIMD, 3);
+                    mask[geneSegIdx3] = ALL_BITS_ZERO;
+                    int geneSegIdx4 = _mm256_extract_epi32(geneSegSIMD, 4);
+                    mask[geneSegIdx4] = ALL_BITS_ZERO;
+                    int geneSegIdx5 = _mm256_extract_epi32(geneSegSIMD, 5);
+                    mask[geneSegIdx5] = ALL_BITS_ZERO;
+                    int geneSegIdx6 = _mm256_extract_epi32(geneSegSIMD, 6);
+                    mask[geneSegIdx6] = ALL_BITS_ZERO;
+                    int geneSegIdx7 = _mm256_extract_epi32(geneSegSIMD, 7);
+                    mask[geneSegIdx7] = ALL_BITS_ZERO;
+                }
+                
+                int geneSeg;
+                for(; geneIdx <= endGene; geneIdx++) {
+                    geneSeg = POP(parent1, geneIdx);
+                    child[geneIdx] = geneSeg;
+                    mask[geneSeg] = ALL_BITS_ZERO;
+                }
+            } else if(sizeof(Int) == 2) {
+                
+                const int ALL_BITS_ZERO = 0x0000;
+                
+                __m256i geneSegSIMD;
+                
+                int geneIdx;
+                const int INC_GENE = (256 / 8) / sizeof(Int); // bytes
+                
+                for(geneIdx = startGene; geneIdx <= (endGene - INC_GENE + 1); geneIdx = geneIdx + INC_GENE) {
+                    // with (endGene - 7) we also take endGene
+                    
+                    geneSegSIMD = _mm256_load_si256((__m256i *)&POP(parent1, geneIdx));
+                    
+                    _mm256_store_si256((__m256i *)&child[geneIdx], geneSegSIMD);
+                    
+                    // extract - store
+                    Int geneSegIdx0 = _mm256_extract_epi16(geneSegSIMD, 0);
+                    mask[geneSegIdx0] = ALL_BITS_ZERO;
+                    Int geneSegIdx1 = _mm256_extract_epi16(geneSegSIMD, 1);
+                    mask[geneSegIdx1] = ALL_BITS_ZERO;
+                    Int geneSegIdx2 = _mm256_extract_epi16(geneSegSIMD, 2);
+                    mask[geneSegIdx2] = ALL_BITS_ZERO;
+                    Int geneSegIdx3 = _mm256_extract_epi16(geneSegSIMD, 3);
+                    mask[geneSegIdx3] = ALL_BITS_ZERO;
+                    Int geneSegIdx4 = _mm256_extract_epi16(geneSegSIMD, 4);
+                    mask[geneSegIdx4] = ALL_BITS_ZERO;
+                    Int geneSegIdx5 = _mm256_extract_epi16(geneSegSIMD, 5);
+                    mask[geneSegIdx5] = ALL_BITS_ZERO;
+                    Int geneSegIdx6 = _mm256_extract_epi16(geneSegSIMD, 6);
+                    mask[geneSegIdx6] = ALL_BITS_ZERO;
+                    Int geneSegIdx7 = _mm256_extract_epi16(geneSegSIMD, 7);
+                    mask[geneSegIdx7] = ALL_BITS_ZERO;
+                    
+                    Int geneSegIdx8 = _mm256_extract_epi16(geneSegSIMD, 8);
+                    mask[geneSegIdx8] = ALL_BITS_ZERO;
+                    Int geneSegIdx9 = _mm256_extract_epi16(geneSegSIMD, 9);
+                    mask[geneSegIdx9] = ALL_BITS_ZERO;
+                    Int geneSegIdx10 = _mm256_extract_epi16(geneSegSIMD, 10);
+                    mask[geneSegIdx10] = ALL_BITS_ZERO;
+                    Int geneSegIdx11 = _mm256_extract_epi16(geneSegSIMD, 11);
+                    mask[geneSegIdx11] = ALL_BITS_ZERO;
+                    Int geneSegIdx12 = _mm256_extract_epi16(geneSegSIMD, 12);
+                    mask[geneSegIdx12] = ALL_BITS_ZERO;
+                    Int geneSegIdx13 = _mm256_extract_epi16(geneSegSIMD, 13);
+                    mask[geneSegIdx13] = ALL_BITS_ZERO;
+                    Int geneSegIdx14 = _mm256_extract_epi16(geneSegSIMD, 14);
+                    mask[geneSegIdx14] = ALL_BITS_ZERO;
+                    Int geneSegIdx15 = _mm256_extract_epi16(geneSegSIMD, 15);
+                    mask[geneSegIdx15] = ALL_BITS_ZERO;
+                }
+                
+                int geneSeg;
+                for(; geneIdx <= endGene; geneIdx++) {
+                    geneSeg = POP(parent1, geneIdx);
+                    child[geneIdx] = geneSeg;
+                    mask[geneSeg] = ALL_BITS_ZERO;
+                }
+            }
+            // TODO: end SIMD version
             
             /*int sum = 0;
             for(int i = 0; i < problem_size; i++) {
@@ -610,7 +675,6 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
 #endif
         
             // writing all the time to child works better
-            // this could be mapped to SIMD in a straightforward way
             int parent2idx = 0;
             
             for(int childIdx = 0; childIdx < startGene;) {
@@ -625,105 +689,107 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
                 parent2idx++;
             }
             
-            
-            // start SIMD version
-            /*int parent2idx = 0;
-            
+            // TODO: start SIMD version
+            /*__m256i maskSegSIMD;
             int childIdx = 0;
-            __m256i parentSegSIMD;
+            int parent2idx = 0;
+            while(true){
+                
+                geneSegSIMD = _mm256_load_si256((__m256i *)&POP(parent2, parent2idx));
+                parent2idx = parent2idx + 8;
+                if(parent2idx + 8 > problem_size) break;
+                
+                maskSegSIMD = _mm256_i32gather_epi32(mask, geneSegSIMD, 4);
+                
+                unsigned int ctl = _mm256_movemask_epi8(maskSegSIMD) & 0x88888888;
+                
+                uint64_t expanded_mask = _pdep_u64(ctl, 0x0101010101010101);
+                expanded_mask *= 0xFF;
+                const uint64_t identity_indices = 0x0706050403020100;
+                uint64_t wanted_indices = _pext_u64(identity_indices, expanded_mask);
+
+                __m128i bytevec = _mm_cvtsi64_si128(wanted_indices);
+                __m256i shufmask = _mm256_cvtepu8_epi32(bytevec);
+
+                _mm256_permutevar8x32_ps(geneSegSIMD, shufmask);
+                
+                
+                int numSetBits = __builtin_popcount(ctl);
+                
+                _mm256_store_si256((__m256i *)(&child[childIdx]), geneSegSIMD);
+                
+                childIdx = childIdx + numSetBits;
+                
+            }*/
+            // TODO: end SIMD version
+            
+            
+            // TODO: start SIMD version
+            /*// reuse geneSegSIMD
             __m256i maskSegSIMD;
-            __m256i maskAddrSIMD = _mm256_set1_epi32(mask);
-            __m256i childSegSIMD;
-            for(; childIdx <= startGene - 8; childIdx = childIdx + 8) {
-                // TODO: this should work well
-                // idea is that consecutive child indices get consecutive parent indices
-                // parent indices can be collectively bit shift operation transformed somehow
-                // need an unaligned load
-                // maybe need to permute
-                // maybe it's possible to do a bit less overwriting (-> less data transfer)
+            
+            int childIdx = 0; // this is used for write synch
+            if(startGene == 0) {
+                // ensure that childIdx is valid
+                childIdx = endGene + 1;
+            }
+            
+            int parent2idx = 0;
+            
+            for(; parent2idx <= problem_size - 8; parent2idx = parent2idx + 8) {
                 
-                // BEGIN LOOP
-                
-                parentSegSIMD = _mm256_load_si256(
-                                    (__m256i *)&(this->population[parent2*problem_size + parent2idx]));
-                
-                // load mask with unaligned load or bcast
-                maskSegSIMD = _mm256_i32gather_epi32(mask, parentSegSIMD, 1);
-                // dst = base_addr + offset
-                
-                parentSegSIMD = _mm256_and_si256(parentSegSIMD, maskSegSIMD);
-                
-                // shuffle
-                // blend - for mixing
-                
-                // could calculate parent increment based on this
+                // load gene segment
+                geneSegSIMD = _mm256_load_si256((__m256i *)&POP(parent2, parent2idx));
+                // load corresponding mask segment
+                maskSegSIMD = _mm256_i32gather_epi32(mask, geneSegSIMD, 4);
                 
                 
-                childSegSIMD = _mm256_mask_i32gather_epi32(childSegSIMD, mask, parentSegSIMD, maskSegSIMD, 1);
-                // dst = (src, base_addr, offset, mask, 1)
-                // dst = src & (not mask) + (base_addr + offset) & mask
+                int ctl = _mm256_movemask_epi8(maskSegSIMD);
                 
-                // load
-                // unaligned load
-                
-                // END LOOP
-                
-                // write child chunk
+                if(ctl & 0x00000008) {
+                    child[childIdx] = _mm256_extract_epi32(geneSegSIMD, 0);
+                    childIdx = (childIdx+1)<startGene||endGene<(childIdx+1)?(childIdx+1):(endGene+1); // write synch
+                }
+                if(ctl & 0x00000080) {
+                    child[childIdx] = _mm256_extract_epi32(geneSegSIMD, 1);
+                    childIdx = (childIdx+1)<startGene||endGene<(childIdx+1)?(childIdx+1):(endGene+1);
+                }
+                if(ctl & 0x00000800) {
+                    child[childIdx] = _mm256_extract_epi32(geneSegSIMD, 2);
+                    childIdx = (childIdx+1)<startGene||endGene<(childIdx+1)?(childIdx+1):(endGene+1);
+                }
+                if(ctl & 0x00008000) {
+                    child[childIdx] = _mm256_extract_epi32(geneSegSIMD, 3);
+                    childIdx = (childIdx+1)<startGene||endGene<(childIdx+1)?(childIdx+1):(endGene+1);
+                }
+                if(ctl & 0x00080000) {
+                    child[childIdx] = _mm256_extract_epi32(geneSegSIMD, 4);
+                    childIdx = (childIdx+1)<startGene||endGene<(childIdx+1)?(childIdx+1):(endGene+1);
+                }
+                if(ctl & 0x00800000) {
+                    child[childIdx] = _mm256_extract_epi32(geneSegSIMD, 5);
+                    childIdx = (childIdx+1)<startGene||endGene<(childIdx+1)?(childIdx+1):(endGene+1);
+                }
+                if(ctl & 0x08000000) {
+                    child[childIdx] = _mm256_extract_epi32(geneSegSIMD, 6);
+                    childIdx = (childIdx+1)<startGene||endGene<(childIdx+1)?(childIdx+1):(endGene+1);
+                }
+                if(ctl & 0x80000000) {
+                    child[childIdx] = _mm256_extract_epi32(geneSegSIMD, 7);
+                    childIdx = (childIdx+1)<startGene||endGene<(childIdx+1)?(childIdx+1):(endGene+1);
+                }
                 
             }
             
-            for(; childIdx < startGene; childIdx++) {
-                child[childIdx] = POP(parent2, parent2idx);
-                childIdx = childIdx + (1 & mask[POP(parent2, parent2idx)]);
-                parent2idx++;
+            // reuse geneSeg
+            for(; parent2idx < problem_size; parent2idx++) {
+                geneSeg = POP(parent2, parent2idx);
+                if(mask[geneSeg]) {
+                    child[childIdx] = geneSeg;
+                    childIdx = (childIdx+1)<startGene||endGene<(childIdx+1)?(childIdx+1):(endGene+1);
+                }
             }*/
-            // end SIMD version
-            
-            
-            /*
-             introduce city -> index map
-             in addition to index -> city map
-             */
-            
-            
-            /*int parent2idx = 0;
-            
-            for(int childIdx = 0; childIdx < startGene; childIdx++) {
-                while(mask[POP(parent2, parent2idx)] == 1) {
-                    parent2idx++;
-                }
-                child[childIdx] = POP(parent2, parent2idx);
-                parent2idx++;
-            }
-            
-            for(int childIdx = endGene+1; childIdx < problem_size; childIdx++) {
-                while(mask[POP(parent2, parent2idx)] == 1) {
-                    parent2idx++;
-                }
-                child[childIdx] = POP(parent2, parent2idx);
-                parent2idx++;
-            }*/
-            
-            
-            /*int childIdx = 0;
-            
-            for(int parent2idx = 0; parent2idx < problem_size; parent2idx++) { // iterate over parent2
-                
-                if(childIdx == startGene) {
-                    childIdx = endGene + 1;
-                    if(childIdx == problem_size) break;
-                    // because this can fail if startGene == endGene == problem_size-1
-                }
-                
-                //assertm(0 <= POP(parent2, parent2idx) && POP(parent2, parent2idx) <= problem_size-1, "segfault mask, loop split");
-                if(mask[POP(parent2, parent2idx)] == 1) {
-                    //cout << childIdx << endl;
-                    //assertm(0 <= childIdx && childIdx <= problem_size-1, "segfault child");
-                    child[childIdx] = POP(parent2, parent2idx);
-                    childIdx++;
-                }
-                
-            }*/
+            // TODO: end SIMD version
             
             
             /*bool sthswrong = false;
@@ -743,6 +809,7 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
             
             if(sthswrong) {
                 cout << "-----------------------" << endl;
+                cout << "problem size is " << problem_size << endl;
                 for(int i = 0; i < problem_size; i++) {
                     cout << child[i] << " ";
                 } cout << endl;
