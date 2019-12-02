@@ -128,7 +128,7 @@ private:
     int* ranks;
     
     /// For convenience as this is used a lot
-    int* genes;
+    Int* genes;
     
     
     /// Number of individuals sent to the network during a migration step
@@ -137,15 +137,19 @@ private:
     /// Number of individuals received from the network during a migration step
     int numIndividualsReceiveBuffer;
     
+    
+    /// Custom MPI_Datatype used for transfering gene data
+    MPI_Datatype CUSTOM_MPI_INT;
+    
 
     /// Send buffer for gene data
-    int* sendBufferGenes;
+    Int* sendBufferGenes;
     
     /// Send buffer for fitness data
     double* sendBufferFitness;
     
     /// Receive buffer for gene data
-    int* receiveBufferGenes;
+    Int* receiveBufferGenes;
     
     /// Receive buffer for fitness data
     double* receiveBufferFitness;
@@ -193,7 +197,7 @@ private:
     double* fitnessWindowBaseAddress;
 
     MPI_Win geneWindow;
-    int* geneWindowBaseAddress;
+    Int* geneWindowBaseAddress;
 
     MPI_Win lockWindow;
     int* lockWindowBaseAddress;
@@ -229,7 +233,7 @@ private:
     
     /// Replaces the geneSize entries of oldGene with the geneSize entries of newGene. This corresponds to replacing
     /// an individual (essentially a gene and a fitness value based thereon) of a population with a new one.
-    void overwriteGene(int* newGene, int* oldGene, int geneSize);
+    void overwriteGene(Int* newGene, Int* oldGene, int geneSize);
     
     /// Computes the Hamming distance between two genes. Each path (gene) is mapped to a list of cities starting
     /// with the city indexed 1. The Hamming distance is computed as the amount of list indices where the list elements
@@ -238,7 +242,7 @@ private:
     /// search for city 1 and then to a cyclic comparison - 1 is safer than 0 because it should work for indexing starting at 0
     /// as well as for indexing starting at 1
     /// as the approach is cyclic the geneSize is needed for wrapping around
-    int computeHammingDistance(int* firstGene, int* scndGene, int geneSize);
+    int computeHammingDistance(Int* firstGene, Int* scndGene, int geneSize);
     
     
     /// Does fitness proportionate selection (roulette wheel selection). The selected individuals are drawn from a probability
@@ -267,16 +271,16 @@ private:
     /// geneSize is numNodes of the TSP graph
     /// islandSize is the number of individuals at the island
     /// ranks: individuals are assumed to be sorted. 0 is best, islandSize-1 is worst
-    void truncationReplacement(int numImmigrants, int* immigrantGenes, double* immigrantFitnesses);
+    void truncationReplacement(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses);
     
     /// All individuals to be replaced are chosen uniformly at random. It is possible that an immigrant is itself replaced
     /// by a subsequent one.
-    void pureRandomReplacement(int numImmigrants, int* immigrantGenes, double* immigrantFitnesses);
+    void pureRandomReplacement(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses);
     
     /// Uses crowding for replacement. For each immigrant, crowdSize individuals are sampled uniformly at random
     /// and their Hamming Distance to the immigrant is computed. The individual which has the smallest Hamming
     /// Distance to the immigrant is replaced. It is possible that an immigrant is itself replaced by a subsequent one.
-    void crowdingReplacement(int numImmigrants, int* immigrantGenes, double* immigrantFitnesses);
+    void crowdingReplacement(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses);
     
 };
 
