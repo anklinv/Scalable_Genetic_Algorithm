@@ -177,6 +177,34 @@ When writing an experiment specification you need to follow this standard:
        ]
      }
      ```
+   - It can be a list of tuples (<VAL_1_1>, <VAL_2_1>, ... , <VAL_L_1>), ... , (<VAL_1_K>, <VAL_2_K>, ... , <VAL_L_K>). Note the parameter name will be ignored:
+     ```
+     {
+       "type" : "tuple",
+       "names" : [
+         <NAME_1>,
+         ...
+         <NAME_L>
+       ],
+       "values" : [
+         {
+           "value" : [
+             <VAL_1_1>,
+             ...
+             <VAL_L_1>
+           ]
+         },
+         ...
+         {
+           "value" : [
+             <VAL_1_K>,
+             ...
+             <VAL_L_K>
+           ]
+         },
+       ]
+     }
+     ```
 
 ## Example JSON for experiment
 In this example we try different number of islands of different sizes. We try every combination of using an island of size k where `1 <= k < 4` and the population size p where `p ∈ {100, 200, 400, 800}` for 10 repetitions.

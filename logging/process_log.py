@@ -116,7 +116,37 @@ class Log(object):
 
         durations = [float(d) / 1e6 * 1e3 for d in diffs]
         return durations
-        
+
+    def get_wall_clock_tuples(self, name: str):
+        begin_full_name = f'wc_{name}_begin'
+        end_full_name = f'wc_{name}_end'
+
+        begin_tag_id = self.tags.tag_names[begin_full_name]
+        end_tag_id = self.tags.tag_names[end_full_name]
+
+        begins = [value for (tag_id, value) in self.log if tag_id == begin_tag_id]
+        ends = [value for (tag_id, value) in self.log if tag_id == end_tag_id]
+
+        assert len(begins) == len(ends)
+        return begins, ends
+
+    def get_epoch_comp_comm_dataframe(self, migration_period: int):
+        begin_tag_id = self.tags.tag_names['wc_epoch_begin']
+        end_tag_id = self.tags.tag_names['wc_epoch_end']
+
+        begins = [value for (tag_id, value) in self.log if tag_id == begin_tag_id]
+        ends = [value for (tag_id, value) in self.log if tag_id == end_tag_id]
+
+        assert len(begins) == len(ends)
+        periods = range(0, len(begins)-migration_period, migration_period)
+        compute_times = list()
+        communication_times = list()
+        for i in periods:
+            compute_times.append((ends[i+migration_period-1] - begins[i]) / 1e3)
+            communication_times.append((begins[i+migration_period] - ends[i+migration_period-1]) / 1e3)
+
+        return list(zip(range(len(periods)), compute_times, communication_times))
+
     def get_cpu_clock_durations(self, name: str):
         ''' Automatically appends the cc_ prefix and _begin or _end suffixes'''
         begin_full_name = f'cc_{name}_begin'
@@ -202,7 +232,7 @@ def logs_in_dir(path):
 
 # Given a log_dir (generated with a leonhard run) and a name, saves a dataframe to name.gz
 # That dataframe contains the epochs, wall clock times, fitness, rep, rank and all the variable parameters
-def generate_dataframe(log_dir, name, tag_loc="tags.hpp"):
+def generate_fitness_wc_dataframe(log_dir, name, tag_loc="tags.hpp"):
     assert isinstance(name, str), "name must be a string"
     assert os.path.isdir(log_dir), "log_dir must be a directory"
     assert os.path.isfile(tag_loc), f"Could not find tag_loc {tag_loc}"
@@ -230,7 +260,17 @@ def generate_dataframe(log_dir, name, tag_loc="tags.hpp"):
     df = None
     for run_name in unique_names:
         params = run_name.split("_")
-        param_names = list(map(lambda x: x.replace("-", ""), json_file["variable_params"].keys()))
+
+        # Get parameter names
+        param_names = list()
+        for key, val in json_file["variable_params"].items():
+            # Handle tuples
+            if val["type"] == "tuple":
+                param_names.extend(val["names"])
+            else:
+                param_names.append(key)
+        param_names = list(map(lambda x: x.replace("-", ""), param_names))
+
         for repetition in range(repetitions):
             folder_name = run_name + "_" + str(repetition)
             folder_contents = os.listdir(os.path.join(log_dir, folder_name))
@@ -260,7 +300,98 @@ def generate_dataframe(log_dir, name, tag_loc="tags.hpp"):
         file_name = name + ".gz"
 
     # Save to disk
-    df.to_csv(file_name, compression="gzip")
+    df.to_csv(file_name, compression="gzip", index=False)
+    return df
+
+
+def generate_periods_dataframe(log_dir, name, tag_loc="tags.hpp"):
+    assert isinstance(name, str), "name must be a string"
+    assert os.path.isdir(log_dir), "log_dir must be a directory"
+    assert os.path.isfile(tag_loc), f"Could not find tag_loc {tag_loc}"
+
+    # Extract tags
+    tags = Tags("tags.hpp")
+
+    all_names = os.listdir(log_dir)
+
+    # Validate JSON
+    json_file = list(filter(lambda x: ".json" in x, all_names))
+    assert len(json_file) > 0, "Found no JSON file in the directory"
+    assert len(json_file) <= 1, "Found multiple JSON files in the directory"
+    json_file = json_file[0]
+
+    # Get parameters from JSON
+    with open(os.path.join(log_dir, json_file)) as file:
+        json_file = json.load(file, object_pairs_hook=OrderedDict)
+
+        # Extract repetitions
+        repetitions = json_file["repetitions"]
+
+        # Make sure we are running on island mode
+        mode = None
+        if "mode" in json_file["fixed_params"]:
+            mode = json_file["fixed_params"]["mode"]
+        elif "mode" in json_file["variable_params"]:
+            mode = json_file["variable_params"]["mode"]
+        assert mode and mode == "island", "Only works with island runs"
+
+        # Extract migration_period
+        migration_period = -1
+        if "--migration_period" in json_file["fixed_params"]:
+            migration_period = json_file["fixed_params"]["--migration_period"]
+        elif "--migration_period" in json_file["variable_params"]:
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
+
+    # Find unique runs (without repetitions)
+    all_names = list(filter(lambda x: os.path.isdir(os.path.join(log_dir, x)), all_names))
+    unique_names = list(set(map(lambda x: "_".join(x.split("_")[:-1]), all_names)))
+
+    df = None
+    for run_name in unique_names:
+        params = run_name.split("_")
+
+        # Get parameter names
+        param_names = list()
+        for key, val in json_file["variable_params"].items():
+            # Handle tuples
+            if val["type"] == "tuple":
+                param_names.extend(val["names"])
+            else:
+                param_names.append(key)
+        param_names = list(map(lambda x: x.replace("-", ""), param_names))
+
+        for repetition in range(repetitions):
+            folder_name = run_name + "_" + str(repetition)
+            folder_contents = os.listdir(os.path.join(log_dir, folder_name))
+            folder_contents = list(filter(lambda x: ".bin" in x, folder_contents))
+            for filename in folder_contents:
+                log = Log(os.path.join(log_dir, folder_name, filename), tags)
+                rank = int(filename.split("_")[-2])
+                if df is None:
+                    df = pd.DataFrame(log.get_epoch_comp_comm_dataframe(migration_period), columns=["period", "computation time", "communication time"])
+                    df["rank"] = rank
+                    df["rep"] = repetition
+                    for param, param_name in zip(params, param_names):
+                        df[param_name] = param
+                else:
+                    df2 = pd.DataFrame(log.get_epoch_comp_comm_dataframe(migration_period), columns=["period", "computation time", "communication time"])
+                    df2["rank"] = rank
+                    df2["rep"] = repetition
+                    for param, param_name in zip(params, param_names):
+                        df2[param_name] = param
+                    df = df.append(df2, ignore_index=True)
+
+    # Figure out correct file ending
+    if name.endswith(".gz"):
+        file_name = name + "_periods"
+    else:
+        file_name = name + "_periods.gz"
+
+    # Save to disk
+    df.to_csv(file_name, compression="gzip", index=False)
+
     return df
 
 

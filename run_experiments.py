@@ -6,6 +6,7 @@ import argparse
 import itertools
 import datetime
 from shutil import copyfile
+from collections import OrderedDict
 
 default_params = {
     "mode": "sequential",
@@ -39,6 +40,11 @@ def param_to_list(param):
         return list(range(start, end, step))
     elif param["type"] == "list":
         return param["list"]
+    elif param["type"] == "tuple":
+        return_list = list()
+        for value in param["values"]:
+            return_list.append(list(zip(param["names"], value["value"])))
+        return return_list
 
 
 def find_param(name, var_names, var_vals, fixed_params, default_params):
@@ -46,6 +52,12 @@ def find_param(name, var_names, var_vals, fixed_params, default_params):
     if name in var_names:
         i = var_names.index(name)
         return var_vals[i]
+
+    # Search in tuples
+    for tuple_param in filter(lambda x: not len(x) == 0 and x[0] == "tuple", list(zip(var_names, var_vals))):
+        for name_, value in tuple_param[1]:
+            if name == name_:
+                return value
 
     # Try fixed params
     if name in fixed_params:
@@ -69,6 +81,22 @@ def create_filename(name):
     return file_name + "_" + timestamp
 
 
+def generate_job_string(job):
+    if len(job) == 0:
+        return "novar"
+
+    job_list = list()
+    for el in job:
+        # Handle tuples
+        if isinstance(el, list):
+            for name, value in el:
+                job_list.append(str(value))
+        else:
+            job_list.append(str(el))
+    job_str = "_".join(job_list)
+    return job_str.replace(".", "").replace("-", "")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Running some experiments")
     parser.add_argument('--dry_run', default=False, dest="dry_run", action="store_true",
@@ -84,6 +112,7 @@ if __name__ == "__main__":
         print("Done!")
 
     print("Running {} consecutive experiment(s)".format(len(args.experiment)))
+    job_count = 0
     for e, experiment in enumerate(args.experiment):
         print("*"*50)
         try:
@@ -92,7 +121,7 @@ if __name__ == "__main__":
             print("Failed to open file {}".format(experiment))
             continue
 
-        experiments = json.load(experiment_file)
+        experiments = json.load(experiment_file, object_pairs_hook=OrderedDict)
         experiment_file.close()
         experiment_name = experiments["name"]
         repetitions = experiments["repetitions"]
@@ -121,8 +150,14 @@ if __name__ == "__main__":
         grid_param = list()
         for param_name, param in experiments["variable_params"].items():
             param_list = param_to_list(param)
-            grid.append(param_list)
-            grid_param.append(param_name)
+
+            # Handle tuples
+            if len(param_list) > 0 and isinstance(param_list[0], list):
+                grid.append(param_list)
+                grid_param.append("tuple")
+            else:
+                grid.append(param_list)
+                grid_param.append(param_name)
 
         for job_num, job in enumerate(itertools.product(*grid)):
             n = find_param("-n", grid_param, job, experiments["fixed_params"], default_params)
@@ -134,10 +169,19 @@ if __name__ == "__main__":
                 # Skip already handeled parameters
                 if el == "-n" or el == "mode":
                     continue
-                program_params += el
-                program_params += " "
-                program_params += str(job[i])
-                program_params += " "
+
+                # Handle tuples
+                if el == "tuple":
+                    for tuple_name, tuple_val in job[i]:
+                        program_params += tuple_name
+                        program_params += " "
+                        program_params += str(tuple_val)
+                        program_params += " "
+                else:
+                    program_params += el
+                    program_params += " "
+                    program_params += str(job[i])
+                    program_params += " "
 
             # Use all fixed params
             for name, param in experiments["fixed_params"].items():
@@ -149,7 +193,8 @@ if __name__ == "__main__":
                 program_params += " "
 
             for repetition in range(repetitions):
-                job_string = "_".join(str(v) for v in job).replace(".", "").replace("-", "") if len(job) > 0 else "novar"
+                job_count += 1
+                job_string = generate_job_string(job)
                 job_string += "_" + str(repetition)
 
                 repetition_logging_location = os.path.join(experiment_dir, job_string, "")
@@ -179,3 +224,5 @@ if __name__ == "__main__":
                         # Do not retry too much
                         time.sleep(15)
 
+    if args.dry_run:
+        print("You are about to schedule {} jobs".format(job_count))
