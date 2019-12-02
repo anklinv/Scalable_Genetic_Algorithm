@@ -33,7 +33,7 @@ public:
     /// \param population_count size of the population
     /// \param elite_size number of individuals that survive for sure
     /// \param mutation_rate 1/mutation_rate is the probability that an individual gets a mutation
-    TravellingSalesmanProblem(int problem_size, float* cities, int population_count, int elite_size, int mutation_rate, int verbose);
+    TravellingSalesmanProblem(int problem_size, Real* cities, int population_count, int elite_size, int mutation_rate, int verbose);
     ~TravellingSalesmanProblem();
 
     /// For debug printing
@@ -52,7 +52,7 @@ public:
     int mutation_rate;
 
     /// 2D coordinates of the cities
-    float* cities;
+    Real* cities;
 
     void set_logger(Logger *_logger);
 

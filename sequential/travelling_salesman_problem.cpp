@@ -62,7 +62,7 @@ double accRuntimeMutate = 0;
 double runtimeSolve = 0;
 
 
-TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, float* cities,
+TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, Real* cities,
         const int population_count, const int elite_size, const int mutation_rate, const int verbose) {
     
     this->verbose = verbose;
@@ -98,6 +98,9 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, flo
      Allocate size bytes of uninitialized storage whose alignment is specified by alignment.
      The size parameter must be an integral multiple of alignment.
      */
+    
+    // TODO: align cities data
+    
     int correctedSize = population_count * problem_size * sizeof(Int);
     correctedSize = correctedSize - correctedSize % 32 + 32;
     this->population = (Int*)aligned_alloc(32, correctedSize);
@@ -454,17 +457,88 @@ void TravellingSalesmanProblem::rank_individuals() {
 }
 
 Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
+    
+    // size of this part of the working set in memory is:
+    // sizeof(Real) * problem_size * problem_size
+    
+    // TODO: begin SIMD version
+    Real sumDistance = 0;
+    
+    __m256 problemSizeSIMD = _mm256_set1_epi32(problem_size);
+    
+    __m256 sumDistanceSIMD = _mm256_set1_ps(0);
+    __m256 distancesSIMD;
+    
+    __m256i geneSegSIMD;
+    __m256i geneSegShiftedSIMD;
+    
+    int geneIdx = 0;
+    for(; geneIdx <= problem_size - 8; geneIdx = geneIdx + 8) {
+        
+        geneSegSIMD = _mm256_load_si256((__m256i *)&POP(individual, geneIdx));
+        
+        // bit shift to left
+        // & duplication (one will overlap treat this sep with extract)
+        
+        int tmp = _mm256_extract_epi32(geneSegSIMD, 4);
+        
+        geneSegShiftedSIMD = _mm256_slli_si256(geneSegSIMD, 32);
+        // shift 128-bit lanes to the left by 32 bit
+        
+        __m256i tmpSIMD = _mm256_set1_epi32(tmp);
+        __m256i tmpMaskSIMD = _mm256_set_epi32(0, 0, 0, 0xFFFFFFFF, 0, 0, 0, 0);
+        
+        tmpSIMD = _mm256_and_si256(tmpSIMD, tmpMaskSIMD);
+        
+        // reinsert somehow
+        // maybe set mask and
+        geneSegShiftedSIMD = _mm256_or_si256(geneSegShiftedSIMD, tmpSIMD);
+        
+        // now we are fine like
+        // 6 5 4 3 2 1 0 x geneSegShiftedSIMD (x is filled with zeros)
+        // 7 6 5 4 3 2 1 0 geneSegSIMD
+        
+        __m256 distanceIndicesSIMD = _mm256_mullo_epi32(geneSegShiftedSIMD, problemSizeSIMD); // super slow
+        // if the loop is unrolled 3-fold can use cast to ps, ps mul, cast to epi32
+        distanceIndicesSIMD = _mm256_add_epi32(distanceIndicesSIMD, geneSegSIMD);
+                
+        // simultaneous load of distances
+        _mm256_i32gather_epi32(cities, distanceIndicesSIMD, 4);
+        
+        // 6-7 5-6 4-5 3-4 2-3 1-2 0-1 x
+        
+        // simultaneous add to SIMD sum
+        sumDistanceSIMD = _mm256_add_ps(sumDistanceSIMD, distancesSIMD);
+        
+        // ok ok ok ok ok ok ok garbage
+        // (use mask at the end to eliminate garbage)
+    }
+    
+    __m256i eliminateSIMD = _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0);
+    
+    sumDistanceSIMD = _mm256_and_si256(sumDistanceSIMD, eliminateSIMD);
+    
+    // do accumulation
+    
+    // finish off with scalar loop
+    
+    // TODO: end SIMD version
+    
+    
     Real route_distance = 0.0;
+    
     for (int j = 0; j < this->problem_size - 1; ++j) {
         VAL_POP(individual, j);
         VAL_POP(individual, j+1);
         VAL_DIST(POP(individual, j), POP(individual, j + 1));
         route_distance += DIST(POP(individual, j), POP(individual, j + 1));
     }
+    
     VAL_POP(individual, this->problem_size - 1);
     VAL_POP(individual, 0);
     VAL_DIST(POP(individual, this->problem_size - 1), POP(individual, 0));
     route_distance += DIST(POP(individual, this->problem_size - 1), POP(individual, 0)); //complete the round trip
+    
     return route_distance;
 }
 
@@ -940,20 +1014,22 @@ void TravellingSalesmanProblem::mutate(const int individual) {
     
     bool useSIMD = false;
     
-    
     if(useSIMD) {
-        
-        __m256i simdMutationRate = _mm256_set1_epi32(this->mutation_rate);
-        
-        // TODO: random simd vector
-        // faster check  i
-        
-        // unaligned load & unaligned store
-        
-        
     } else {
-    
+        
         if (rand() % this->mutation_rate == 0) {
+            int swap = rand_range(0, this->problem_size - 1);
+            int swap_with = rand_range(0, this->problem_size - 1);
+
+            VAL_POP(individual, swap);
+            VAL_POP(individual, swap_with);
+            Int city1 = POP(individual, swap);
+            Int city2 = POP(individual, swap_with);
+            POP(individual, swap) = city2;
+            POP(individual, swap_with) = city1;
+        }
+    
+        /*if (rand() % this->mutation_rate == 0) {
             int swap = rand_range(0, this->problem_size - 1);
             int swap_with = rand_range(0, this->problem_size - 1);
 
@@ -963,7 +1039,7 @@ void TravellingSalesmanProblem::mutate(const int individual) {
             int city2 = POP(individual, swap_with);
             POP(individual, swap) = city2;
             POP(individual, swap_with) = city1;
-        }
+        }*/
     
     }
     
