@@ -17,9 +17,12 @@
 #define PROB_SIZE 48
 #define EPOCHS 100
 #define ISLANDS 4
+#define MUTATION 0.15   //rate
+#define MIGRATION 5    //integer determining how many members migrate from one island
 #define POP(i,j) population[i * PROB_SIZE + j]
 #define NPOP(i,j) new_population[i * PROB_SIZE + j]
 #define DIST(i,j) problem[i * PROB_SIZE + j]
+#define ISLAND_MEMBERS POP_SIZE / ISLANDS
 
 //https://stackoverflow.com/questions/1577475/c-sorting-and-keeping-track-of-indexes
 //https://github.com/thrust/thrust/wiki/Quick-Start-Guide#fancy-iterators
@@ -30,53 +33,85 @@ __global__ void rank_individuals(int *population, float *problem, float *fitness
 	//blockDim: number of threads in block
 	//gridDim: number of blocks in grid
 	int index = threadIdx.x + blockIdx.x * blockDim.x;
-	for (int i = index; i < POP_SIZE; i++) {
-		for (int j = 0; j < PROB_SIZE - 1; j++) {
-			fitness[i] += DIST(j,j+1);
-		}
-		fitness[i] += DIST(PROB_SIZE - 1, 0);
-		//fitness[i] = 1/fitness[i];
-	}
+    for (int j = 0; j < PROB_SIZE - 1; j++) {
+        fitness[index] += DIST(j,j+1);
+    }
+    fitness[index] += DIST(PROB_SIZE - 1, 0);
+    fitness[index] = 1/fitness[index];
 	__syncthreads();
 }
 
-__global__ void crossover(int *population, float *fitness, int *prefix_sort_fintess, int *new_population) {
+__global__ void crossover_and_migrate(int *population, float *fitness, int *prefix_sort_fintess, int *new_population) {
 	int index = threadIdx.x + blockIdx.x * blockDim.x;
+    int temp[PROB_SIZE * MIGRATION];
 	int parent1_id;
 	int parent2_id;
+    int migrant_1, migrant_2, island_1, island_2;
 	float roulette;
+    int r_1, r_2;
 	int existing;
-	for (int i = index; i < POP_SIZE; i++) {
+    int migrant_index;
 
-		//get indices of the two parents by a random variable that has the normalized fitness values as distributions (use the thrust lower bound on the prefix sorted fitness values) 
-		roulette = rand() % prefix_sort_fitness[POP_SIZE-1];
-		parent1_id = thrust::lower_bound(thrust::device, prefix_sort_fitness, prefix_sort_fitness + POP_SIZE, roulette) - prefix_sort - 1;
-		roulette = rand() % prefix_sort_fitness[POP_SIZE-1];
-		parent2_id = thrust::lower_bound(thrust::device, prefix_sort_fitness, prefix_sort_fitness + POP_SIZE, roulette) - prefix_sort - 1;
+    //get indices of the two parents by a random variable that has the normalized fitness values as distributions (use the thrust lower bound on the prefix sorted fitness values)
+    roulette = rand() % prefix_sort_fitness[POP_SIZE-1];
+    parent1_id = thrust::lower_bound(thrust::device, prefix_sort_fitness, prefix_sort_fitness + POP_SIZE, roulette) - prefix_sort - 1;
+    roulette = rand() % prefix_sort_fitness[POP_SIZE-1];
+    parent2_id = thrust::lower_bound(thrust::device, prefix_sort_fitness, prefix_sort_fitness + POP_SIZE, roulette) - prefix_sort - 1;
 	
-		//fill the first half of the child with the first parent
-		for (int j = 0; j < int(PROB_SIZE/2); j++){
-			NPOP(i,j) = POP(parent1_id,j);
+    //fill the first half of the child with the first parent
+    for (int j = 0; j < int(PROB_SIZE/2); j++){
+        NPOP(index,j) = POP(parent1_id,j);
 		
-		//fill the rest of the child with -1 entries such that it is no longer garbage
-		for (int j = int(PROB_SIZE/2); j < PROB_SIZE; j++) {
-			NPOP(i,j) = -1;
+    //fill the rest of the child with -1 entries such that it is no longer garbage
+    for (int j = int(PROB_SIZE/2); j < PROB_SIZE; j++) {
+        NPOP(index,j) = -1;
 		
-		//for the second half of the child we only choose entries from parent 2 that aren't already in the child
-		for (int j = int(PROB_SIZE/2); j < PROB_SIZE; j++) {
-			for (int k = 0; k < PROB_SIZE; k++) {
-				existing = thrust::find(thrust::device, *NPOP(i,0), *NPOP(i,j), POP(parent2_id,k)) - *NPOP(i,0);
-				if (existing != j){
-					NPOP(i,j) = existing;
-					break;
-				}
-			}
-		}
-	}
-	__syncthreads();					
+    //for the second half of the child we only choose entries from parent 2 that aren't already in the child
+    for (int j = int(PROB_SIZE/2); j < PROB_SIZE; j++) {
+        for (int k = 0; k < PROB_SIZE; k++) {
+            existing = thrust::find(thrust::device, *NPOP(index,0), *NPOP(index,j), POP(parent2_id,k)) - *NPOP(index,0);
+            if (existing != j){
+                NPOP(index,j) = existing;
+                break;
+            }
+        }
+    }
+    //perform the migration
+    if (threadIdx.x == 0) {
+        island_1 = index % ISLANDS;
+        island_2 = (island_1 + 1) % ISLANDS;
+        r_1 = rand() % ISLAND_MEMBERS;
+        r_2 = rand() % ISLAND_MEMBERS;
+    }
+	__syncthreads();
+    //Each thread takes a single gene from one of five
+    if (threadIdx.x != 0 && threadIdx.x < PROB_SIZE * MIGRATION) {
+        migrant_index = threadIdx.x - 1;
+        temp[migrant_index] = NPOP(island_1 * ISLAND_MEMBERS + r_1, remainder(migrant_index, PROB_SIZE));
+        NPOP(island_1 * POP_SIZE / ISLAND + r_1, remainder(migrant_index, PROB_SIZE)) = NPOP(island_2 * ISLAND_MEMBERS + r_2, remainder(migrant_index, PROB_SIZE))
+        NPOP(island_2 * POP_SIZE / ISLAND + r_2, remainder(migrant_index, PROB_SIZE)) = temp[migrant_index];
+    }
 }
 
-__global__ void
+__global__ void mutate(int * population){
+    int index = threadIdx.x + blockIdx.x * blockDim.x;
+    int temp;
+    default_random_engine generator;
+    for (int j = 0; j < PROB_SIZE; j++){
+        bernoulli_distribution ber(MUTATION);
+        if (ber(generator)){
+            for (int k = 0; k < PROB_SIZE; k++) {
+                bernoulli_distribution ber(MUTATION);
+                if (ber(generator)){
+                    temp = POP(index,j);
+                    POP(index,j) = POP(index,k);
+                    POP(index,k) = temp;
+                    break;
+                }
+            }
+        }
+    }
+}
 
 int main (void) {
 
@@ -120,16 +155,23 @@ int main (void) {
 	//run GA
 	for (int i = 0; i < EPOCHS; i++){
 		//begin epoch by ranking fitness of population
-		rank_individuals<<<ISLANDS, POP_SIZE / ISLANDS>>>(population,problem,fitness);
+		rank_individuals<<<ISLANDS, ISLAND_MEMBERS>>>(population,problem,fitness);
 		
 		//perform a sort of the fitness values to implement the elitism strategy
-		thrust::sort_by_key(sorted_fitness, sorted_fitness + POP_SIZE, fitness);
+        for (int j = 0; j < ISLANDS; j++) {
+            thrust::sort_by_key(sorted_fitness + j * ISLAND_MEMBERS, sorted_fitness + (j + 1) * ISLAND_MEMBERS, fitness + j * ISLAND_MEMBERS);
+        }
 
 		//perform a prefix sum of the fitness in order to easily perform roulette wheel selection of a suitable parent
-		thrust::inclusive_scan(fitness, fitness + POP_SIZE, prefix_sort_fitness);
-
+        for (int j = 0; j < ISLANDS; j++) {
+            thrust::inclusive_scan(fitness + j * ISLAND_MEMBERS, fitness + (j + 1) * ISLAND_MEMBERS, prefix_sort_fitness + j * ISLAND_MEMBERS);
+        }
+        
 		//perform crossover on the islands
-		crossover<<<ISLANDS, POP_SIZE / ISLANDS>>>(population,fitness,prefix_sort_fitness,new_population);
+		crossover_and_migrate<<<ISLANDS, ISLAND_MEMBERS>>>(population,fitness,prefix_sort_fitness,new_population);
+  
+        //mutate the population
+        mutate<<<ISLANDS, ISLAND_MEMBERS>>>(population);
 	}
 
 	cudaFree(population);
