@@ -56,7 +56,10 @@ def create_barplot(df, ax, nr_bars=10, rnd=-1, ylog=False, thresholds=None):
     order.sort()
     order = list(reversed(order))
 
-    chart = sns.barplot(ax=ax, x="threshold", y="wall clock time", hue="n", data=plot_df, order=order, palette="autumn")
+    if "n" in df:
+        chart = sns.barplot(ax=ax, x="threshold", y="wall clock time", hue="n", data=plot_df, order=order, palette="autumn")
+    else:
+        chart = sns.barplot(ax=ax, x="threshold", y="wall clock time", data=plot_df, order=order, palette="autumn")
     if ylog:
         chart.set_yscale("log")
     chart.set_xticklabels(chart.get_xticklabels(), rotation=90)
