@@ -7,11 +7,14 @@
 #include <chrono>
 #include <array>
 #include <cassert>
+<<<<<<< HEAD
 #include <immintrin.h> // for SIMD
 #include <fstream> // for writing CSV files
 #include <stdlib.h> // for aligned alloc
 #include <bitset> // for debugging
 #include <iomanip>
+=======
+>>>>>>> parent of 640d84e... added sequential optimizations
 #include "travelling_salesman_problem.hpp"
 
 #define SAFE_DEBUG
@@ -31,6 +34,7 @@ using namespace std;
 bool log_all_values = false;
 bool log_best_value = true;
 
+<<<<<<< HEAD
 
 /*
  For microbenchmarking.
@@ -63,6 +67,9 @@ double runtimeSolve = 0;
 
 
 TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, Real* cities,
+=======
+TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, float* cities,
+>>>>>>> parent of 640d84e... added sequential optimizations
         const int population_count, const int elite_size, const int mutation_rate, const int verbose) {
     
     this->verbose = verbose;
@@ -86,6 +93,7 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, Rea
     this->fitness_sum = -1;
 
     // TODO: make this nicer
+<<<<<<< HEAD
     //this->population = new Int[population_count * problem_size];
     
     
@@ -117,12 +125,15 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, Rea
     correctedSize = correctedSize - correctedSize % 32 + 32;
     this->fitness = (Real*)aligned_alloc(32, correctedSize);
     // end SIMD version
+=======
+    this->population = new int[population_count * problem_size];
+>>>>>>> parent of 640d84e... added sequential optimizations
     
     this->evolutionCounter = 0;
 
     // Randomly initialize the populations
-    vector<Int> tmp_indices(problem_size);
-    for (Int i = 0; i < problem_size; ++i) {
+    vector<int> tmp_indices(problem_size);
+    for (int i = 0; i < problem_size; ++i) {
         tmp_indices[i] = i;
     }
 
@@ -133,6 +144,7 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, Rea
             POP(i,j) = tmp_indices[j]; //this works
         }
     }
+<<<<<<< HEAD
     
     cout << "size of one gene element is " << sizeof(Int) << " bytes " << endl;
     cout << "size of entire gene is " << sizeof(Int) * problem_size << " bytes " << endl;
@@ -211,6 +223,11 @@ TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     delete this->fitness;
     // end SIMD
     
+=======
+}
+
+TravellingSalesmanProblem::~TravellingSalesmanProblem() {
+>>>>>>> parent of 640d84e... added sequential optimizations
     this->logger->close();
     delete this->logger;
 }
@@ -259,10 +276,13 @@ void TravellingSalesmanProblem::evolve(const int rank) {
     // TODO: PROFILING start
     tStart = myClock.now();
     this->mutate_population();
+<<<<<<< HEAD
     tEnd = myClock.now();
     accRuntimeMutate += std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
     // TODO: PROFILING end
     
+=======
+>>>>>>> parent of 640d84e... added sequential optimizations
 #ifdef debug_evolve
     cout << "After:" << endl;
     for (int i = 0; i < population_count; ++i) {
@@ -272,7 +292,6 @@ void TravellingSalesmanProblem::evolve(const int rank) {
         cout << endl;
     }
 #endif
-    
 }
 
 Real TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
@@ -557,6 +576,7 @@ void print256_bitset(__m256i var) {
 //possible solutions:
 //  * take 50% of each parent as opposed to randomly taking a sequence
 //  *
+<<<<<<< HEAD
 void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int* child) {
     
     
@@ -960,25 +980,61 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
         
     } // end if else
     
+=======
+void TravellingSalesmanProblem::breed(const int parent1, const int parent2, int* child) {
+    //selecting gene sequences to be carried over to child
+    int geneA = this->rand_range(0, this->problem_size - 1);
+    int geneB = this->rand_range(0, this->problem_size - 1);
+    int startGene = min(geneA, geneB);
+    int endGene = max(geneA, geneB);
+
+    set<int> selected;
+    for (int i = startGene; i <= endGene; ++i) {
+        VAL_POP(parent1, i);
+        child[i] = POP(parent1, i);
+        selected.insert(POP(parent1, i));
+    }
+
+    int index = 0;
+    for (int i = 0; i < this->problem_size; ++i) {
+        // If not already chosen that city
+        VAL_POP(parent2, i);
+        if (selected.find(POP(parent2, i)) == selected.end()) {
+            if (index == startGene) {
+                index = endGene + 1;
+            }
+            child[index] = POP(parent2, i);
+            index++;
+        }
+    }
+>>>>>>> parent of 640d84e... added sequential optimizations
 }
 
 void TravellingSalesmanProblem::breed_population() {
     this->logger->LOG_WC(BREED_POPULATION_BEGIN);
+<<<<<<< HEAD
     
     // TODO: do this in-place
     // TODO: make this global (don't allocate, free, allocate, free, ... as this is "huge")
     // in order to speed things up
     //Int temp_population[this->population_count][this->problem_size];
     
+=======
+    int temp_population[this->population_count][this->problem_size];
+>>>>>>> parent of 640d84e... added sequential optimizations
 
     // Keep the best individuals
     for (int i = 0; i < this->elite_size; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
+<<<<<<< HEAD
             //temp_population[i][j] = POP(this->ranks[i], j);
             // start SIMD version
             temp_population[i*problem_size + j] = POP(this->ranks[i], j);
             // end SIMD version
             //population[i][j] = POP(this->ranks[i], j);
+=======
+            temp_population[i][j] = POP(this->ranks[i], j);
+>>>>>>> parent of 640d84e... added sequential optimizations
         }
     }
 
@@ -993,6 +1049,7 @@ void TravellingSalesmanProblem::breed_population() {
     for (int i = this->elite_size; i < this->population_count; ++i) {
         int rand1 = dist(gen);
         int rand2 = dist(gen);
+<<<<<<< HEAD
         //this->breed(rand1, rand2, temp_population[i]);
         // start SIMD version
         this->breed(rand1, rand2, &temp_population[i*problem_size]);
@@ -1001,16 +1058,23 @@ void TravellingSalesmanProblem::breed_population() {
     }
     
     /*for (int i = 0; i < this->population_count; ++i) {
+=======
+        this->breed(rand1, rand2, temp_population[i]);
+    }
+
+    for (int i = 0; i < this->population_count; ++i) {
+>>>>>>> parent of 640d84e... added sequential optimizations
         for (int j = 0; j < this->problem_size; ++j) {
             VAL_POP(i, j);
             POP(i, j) = temp_population[i][j];
         }
-    }*/
+    }
     this->logger->LOG_WC(BREED_POPULATION_END);
     
 }
 
 void TravellingSalesmanProblem::mutate(const int individual) {
+<<<<<<< HEAD
     
     bool useSIMD = false;
     
@@ -1041,15 +1105,24 @@ void TravellingSalesmanProblem::mutate(const int individual) {
             POP(individual, swap_with) = city1;
         }*/
     
+=======
+    if (rand() % this->mutation_rate == 0) {
+        int swap = rand_range(0, this->problem_size - 1);
+        int swap_with = rand_range(0, this->problem_size - 1);
+
+        VAL_POP(individual, swap);
+        VAL_POP(individual, swap_with);
+        int city1 = POP(individual, swap);
+        int city2 = POP(individual, swap_with);
+        POP(individual, swap) = city2;
+        POP(individual, swap_with) = city1;
+>>>>>>> parent of 640d84e... added sequential optimizations
     }
-    
 }
 
 void TravellingSalesmanProblem::mutate_population() {
     this->logger->LOG_WC(MUTATE_POPULATION_BEGIN);
-    
     for (int i = this->elite_size / 2; i < this->population_count; ++i) {
-        
 #ifdef debug_mutate
         cout << "mutating individual:" << endl;
         for (int j = 0; j < this->problem_size; ++j) {
@@ -1057,18 +1130,14 @@ void TravellingSalesmanProblem::mutate_population() {
         }
         cout << endl;
 #endif
-        
         this->mutate(i);
-        
 #ifdef debug_mutate
         for (int j = 0; j < this->problem_size; ++j) {
             cout << pop[j] << " ";
         }
         cout << endl;
 #endif
-        
     }
-    
     this->logger->LOG_WC(MUTATE_POPULATION_END);
 }
 
@@ -1080,7 +1149,7 @@ int* TravellingSalesmanProblem::getRanks() { // for Island
     return ranks;
 }
 
-Int* TravellingSalesmanProblem::getGenes() { // for Island
+int* TravellingSalesmanProblem::getGenes() { // for Island
     return population;
 }
 

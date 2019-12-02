@@ -37,19 +37,15 @@ COMMUNICATION(communication) { // initializer list
     numIndividualsSendBuffer = computeSendBufferSize();
     numIndividualsReceiveBuffer = computeReceiveBufferSize(numIndividualsSendBuffer);
     
-    sendBufferGenes = new Int[numIndividualsSendBuffer * numIntegersGene];
+    sendBufferGenes = new int[numIndividualsSendBuffer * numIntegersGene];
     sendBufferFitness = new double[numIndividualsSendBuffer];
     
-    receiveBufferGenes = new Int[numIndividualsReceiveBuffer * numIntegersGene];
+    receiveBufferGenes = new int[numIndividualsReceiveBuffer * numIntegersGene];
     receiveBufferFitness = new double[numIndividualsReceiveBuffer];
     
     
-    // create a custom MPI datatype in order to transfer gene data
-    MPI_Type_contiguous(sizeof(Int), MPI_BYTE, &CUSTOM_MPI_INT);
-    MPI_Type_commit(&CUSTOM_MPI_INT);
-    
-    
-    // initialize communication request handles to null
+    // initialize communication request handles to null such that they do not block
+    // during the first migration
     sendBufferFitnessRequest = MPI_REQUEST_NULL;
     sendBufferGenesRequest = MPI_REQUEST_NULL;
     MPI_Request receiveBufferFitnessRequest = MPI_REQUEST_NULL;
@@ -59,9 +55,6 @@ COMMUNICATION(communication) { // initializer list
 
 
 Island::~Island() {
-    
-    // free custom MPI datatype
-    MPI_Type_free(&CUSTOM_MPI_INT);
     
     // free buffers
     delete sendBufferGenes;
@@ -73,7 +66,7 @@ Island::~Island() {
 }
 
 
-void Island::overwriteGene(Int* newGene, Int* oldGene, int geneSize) {
+void Island::overwriteGene(int* newGene, int* oldGene, int geneSize) {
     
     for(int geneIdx = 0; geneIdx < geneSize; geneIdx++) {
         oldGene[geneIdx] = newGene[geneIdx];
@@ -86,7 +79,7 @@ void Island::overwriteGene(Int* newGene, Int* oldGene, int geneSize) {
 }
 
 
-int Island::computeHammingDistance(Int* firstGene, Int* scndGene, int geneSize) {
+int Island::computeHammingDistance(int* firstGene, int* scndGene, int geneSize) {
     
     int hammingDistance = 0;
     
@@ -287,7 +280,7 @@ void Island::pureRandomSelection(int* sampledIndividuals, int numIndividualsToSa
 }
 
 
-void Island::truncationReplacement(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses) {
+void Island::truncationReplacement(int numImmigrants, int* immigrantGenes, double* immigrantFitnesses) {
     
     // Use (idx, fitness) pairs to facilitate sorting
     Individual immigrants[numImmigrants];
@@ -335,8 +328,8 @@ void Island::truncationReplacement(int numImmigrants, Int* immigrantGenes, doubl
     // - the ranks stored in the TSP object are no longer correct after this step
     for(int indivIdx = 0; indivIdx < numToReplace; indivIdx++) {
         
-        Int* currGene = &genes[ranks[(numIndividualsIsland - numImmigrants) + indivIdx] * numIntegersGene];
-        Int* newGene = &immigrantGenes[immigrants[indivIdx].idx * numIntegersGene];
+        int* currGene = &genes[ranks[(numIndividualsIsland - numImmigrants) + indivIdx] * numIntegersGene];
+        int* newGene = &immigrantGenes[immigrants[indivIdx].idx * numIntegersGene];
         
         overwriteGene(newGene, currGene, numIntegersGene);
         
@@ -347,14 +340,14 @@ void Island::truncationReplacement(int numImmigrants, Int* immigrantGenes, doubl
 }
 
 
-void Island::pureRandomReplacement(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses) {
+void Island::pureRandomReplacement(int numImmigrants, int* immigrantGenes, double* immigrantFitnesses) {
     
     for(int immigrantIdx = 0; immigrantIdx < numImmigrants; immigrantIdx++) {
         
         int indivToReplace = rand() % numIndividualsIsland;
         
-        Int* currGene = &genes[indivToReplace * numIntegersGene];
-        Int* newGene = &immigrantGenes[immigrantIdx * numIntegersGene];
+        int* currGene = &genes[indivToReplace * numIntegersGene];
+        int* newGene = &immigrantGenes[immigrantIdx * numIntegersGene];
         
         overwriteGene(newGene, currGene, numIntegersGene);
         
@@ -364,7 +357,7 @@ void Island::pureRandomReplacement(int numImmigrants, Int* immigrantGenes, doubl
 }
 
 
-void Island::crowdingReplacement(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses) {
+void Island::crowdingReplacement(int numImmigrants, int* immigrantGenes, double* immigrantFitnesses) {
     
     int crowdSize = 3;
     
@@ -538,8 +531,8 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
             MPI_Allgather(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
                           receiveBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE, MPI_COMM_WORLD);
             
-            MPI_Allgather(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT,
-                          receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT, MPI_COMM_WORLD);
+            MPI_Allgather(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
+                          receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT, MPI_COMM_WORLD);
             
             emptyReceiveBuffers();
             
@@ -576,9 +569,9 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
                                       srcRankID, FITNESS_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             //assert(status == MPI_SUCCESS);
             
-            status = MPI_Sendrecv(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT,
+            status = MPI_Sendrecv(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
                                   destRankID, GENE_TAG,
-                                  receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, CUSTOM_MPI_INT,
+                                  receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, MPI_INT,
                                   srcRankID, GENE_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             //assert(status == MPI_SUCCESS);
             
@@ -605,8 +598,8 @@ void Island::doNonblockingCommunicationSetup() {
                            receiveBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
                            MPI_COMM_WORLD, &receiveBufferFitnessRequest);
                 
-            MPI_Iallgather(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT,
-                           receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT,
+            MPI_Iallgather(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
+                           receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
                            MPI_COMM_WORLD, &receiveBufferGenesRequest);
             
             break;
@@ -632,7 +625,7 @@ void Island::doNonblockingCommunicationSetup() {
             MPI_Isend(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE, destRankID,
                       FITNESS_TAG, MPI_COMM_WORLD, &sendBufferFitnessRequest);
             
-            MPI_Isend(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT, destRankID,
+            MPI_Isend(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT, destRankID,
                       GENE_TAG, MPI_COMM_WORLD, &sendBufferGenesRequest);
             
             
@@ -645,7 +638,7 @@ void Island::doNonblockingCommunicationSetup() {
             MPI_Irecv(receiveBufferFitness, numIndividualsReceiveBuffer, MPI_DOUBLE, srcRankID,
                       FITNESS_TAG, MPI_COMM_WORLD, &receiveBufferFitnessRequest);
             
-            MPI_Irecv(receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, CUSTOM_MPI_INT, srcRankID,
+            MPI_Irecv(receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, MPI_INT, srcRankID,
                       GENE_TAG, MPI_COMM_WORLD, &receiveBufferGenesRequest);
             
             break;
@@ -676,8 +669,8 @@ void Island::doNonblockingCommunication() {
                            receiveBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
                            MPI_COMM_WORLD, &receiveBufferFitnessRequest);
             
-            MPI_Iallgather(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT,
-                           receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT,
+            MPI_Iallgather(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
+                           receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
                            MPI_COMM_WORLD, &receiveBufferGenesRequest);
             
             break;
@@ -710,7 +703,7 @@ void Island::doNonblockingCommunication() {
                 MPI_Isend(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE, destRankID,
                           FITNESS_TAG, MPI_COMM_WORLD, &sendBufferFitnessRequest);
                 
-                MPI_Isend(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT, destRankID,
+                MPI_Isend(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT, destRankID,
                           GENE_TAG, MPI_COMM_WORLD, &sendBufferGenesRequest);
                 
                 
@@ -728,7 +721,7 @@ void Island::doNonblockingCommunication() {
                 MPI_Irecv(receiveBufferFitness, numIndividualsReceiveBuffer, MPI_DOUBLE, srcRankID,
                           FITNESS_TAG, MPI_COMM_WORLD, &receiveBufferFitnessRequest);
                 
-                MPI_Irecv(receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, CUSTOM_MPI_INT, srcRankID,
+                MPI_Irecv(receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, MPI_INT, srcRankID,
                           GENE_TAG, MPI_COMM_WORLD, &receiveBufferGenesRequest);
                 
                 
@@ -748,7 +741,7 @@ void Island::doNonblockingCommunication() {
                 MPI_Irecv(receiveBufferFitness, numIndividualsReceiveBuffer, MPI_DOUBLE, srcRankID,
                           FITNESS_TAG, MPI_COMM_WORLD, &receiveBufferFitnessRequest);
                 
-                MPI_Irecv(receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, CUSTOM_MPI_INT, srcRankID,
+                MPI_Irecv(receiveBufferGenes, numIndividualsReceiveBuffer * numIntegersGene, MPI_INT, srcRankID,
                           GENE_TAG, MPI_COMM_WORLD, &receiveBufferGenesRequest);
                 
                 
@@ -763,7 +756,7 @@ void Island::doNonblockingCommunication() {
                 MPI_Isend(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE, destRankID,
                           FITNESS_TAG, MPI_COMM_WORLD, &sendBufferFitnessRequest);
                 
-                MPI_Isend(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT, destRankID,
+                MPI_Isend(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT, destRankID,
                           GENE_TAG, MPI_COMM_WORLD, &sendBufferGenesRequest);
 
             }
@@ -866,8 +859,8 @@ void Island::setupRMACommunication() {
                      sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD,
                      &fitnessWindowBaseAddress, &fitnessWindow);
     
-    MPI_Win_allocate(numIndividualsReceiveBuffer * numIntegersGene * sizeof(Int),
-                     sizeof(Int), MPI_INFO_NULL, MPI_COMM_WORLD,
+    MPI_Win_allocate(numIndividualsReceiveBuffer * numIntegersGene * sizeof(int),
+                     sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD,
                      &geneWindowBaseAddress, &geneWindow);
         
     // allocate the memory containing the lock
@@ -950,9 +943,9 @@ bool Island::doRMASend() {
                        destRankID,
                        0, numIndividualsSendBuffer, MPI_DOUBLE, MPI_REPLACE, fitnessWindow);
         
-        MPI_Accumulate(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT,
+        MPI_Accumulate(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, MPI_INT,
                        destRankID,
-                       0, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT, MPI_REPLACE, geneWindow);
+                       0, numIndividualsSendBuffer * numIntegersGene, MPI_INT, MPI_REPLACE, geneWindow);
         
         // block until RMA communication is done
         MPI_Win_flush(destRankID, fitnessWindow);

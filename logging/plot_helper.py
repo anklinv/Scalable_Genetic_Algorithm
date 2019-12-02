@@ -7,35 +7,18 @@ import numpy as np
 from process_log import Tags, Log, Epochs, generate_dataframe
 
 
-def create_barplot(df, ax, hue="n", nr_bars=10, rnd=-1, ylog=False, thresholds=None):
+def create_barplot(df, ax, nr_bars=10, rnd=-1, ylog=False, thresholds=None):
     assert "fitness" in df, "Fitness not in dataframe"
     assert "wall clock time" in df, "Wall clock time not in dataframe"
-    assert hue in df, "Hue not in dataframe"
 
-    
-    if "rank" in df: # do aggregation over ranks
-        
+    if "rank" in df:
         to_keep = ["epoch"]
         if "n" in df:
             to_keep.append("n")
         if "rep" in df:
-            to_keep.append("rep") # used for confidence interval
-            
-        if hue in df:
-            to_keep.append(hue)
-        
-        
-        if "epoch" in df:
-            df = df.drop(columns=["epoch"])
-            
-        
-        df = df.groupby(to_keep, as_index=False)
-        
-        # at max wall clock time min fitness was reached for sure
-        # it is at max wall clock time when the result of an epoch is known
-        df = df.agg({"fitness" : "min", "wall clock time" : "max"})
-        
-        
+            to_keep.append("rep")
+        df = df.groupby(to_keep, as_index=False).agg({"fitness" : "min", "wall clock time" : "max"}).drop(columns=["epoch"])
+
     # Calculate start and end of thresholds
     if "n" in df:
         max_fitness = df.groupby("n").agg({"fitness" : "max"}).fitness.min()
@@ -52,7 +35,7 @@ def create_barplot(df, ax, hue="n", nr_bars=10, rnd=-1, ylog=False, thresholds=N
     if "n" in df:
         to_keep = ["rep", "n"]
     else:
-        to_keep = ["rep", hue]
+        to_keep = ["rep"]
 
     # Generate dataframe for plotting
     plot_df = None
@@ -69,8 +52,8 @@ def create_barplot(df, ax, hue="n", nr_bars=10, rnd=-1, ylog=False, thresholds=N
     order = list(set(plot_df.threshold))
     order.sort()
     order = list(reversed(order))
-    
-    chart = sns.barplot(ax=ax, x="threshold", y="wall clock time", hue=hue, data=plot_df, order=order, palette="autumn")
+
+    chart = sns.barplot(ax=ax, x="threshold", y="wall clock time", hue="n", data=plot_df, order=order, palette="autumn")
     if ylog:
         chart.set_yscale("log")
     chart.set_xticklabels(chart.get_xticklabels(), rotation=90)
