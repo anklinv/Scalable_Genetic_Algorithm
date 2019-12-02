@@ -8,19 +8,6 @@
 
 using namespace std;
 
-
-/*
- For microbenchmarking.
- */
-
-typedef std::vector<int> vi;
-
-typedef std::chrono::high_resolution_clock hrClock;
-typedef std::chrono::time_point<hrClock> hrTime;
-
-typedef std::chrono::microseconds hrMillies;
-
-
 struct City {
     double x, y;
 };

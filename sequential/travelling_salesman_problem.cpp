@@ -33,6 +33,13 @@ bool log_best_value = true;
  For microbenchmarking.
  */
 
+typedef std::vector<int> vi;
+
+typedef std::chrono::high_resolution_clock hrClock;
+typedef std::chrono::time_point<hrClock> hrTime;
+
+typedef std::chrono::nanoseconds hrNanos;
+
 vi rndRuntimes;
 vi chunkRuntimes;
 vi splitRuntimes;
@@ -85,20 +92,32 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, flo
         }
     }
     
-    cout << "size of one gene element is " << sizeof(Int) << " bytes " << endl;
-    cout << "size of entire gene is " << sizeof(Int) * problem_size << " bytes " << endl;
-    cout << "size of entire population is (w/o fitness) " << sizeof(Int) * problem_size * population_count << " bytes " << endl;
+#ifdef microbenchmark_breed
+    cout << "Size of one gene index is " << sizeof(Int) << " bytes " << endl;
+    cout << "Size of entire gene is " << sizeof(Int) * problem_size << " bytes " << endl;
+    cout << "Size of entire population is (w/o fitness, temp_population, distances) ";
+    cout << sizeof(Int) * problem_size * population_count << " bytes " << endl;
+#endif
+    
 }
 
 TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     
 #ifdef microbenchmark_breed
-    cout << "mean runtime rnd (us):" << endl;
-    cout << (double)accumulate(rndRuntimes.begin(), rndRuntimes.end(), 0)/this->evolutionCounter << endl;
-    cout << "mean runtime chunk (us):" << endl;
-    cout << (double)accumulate(chunkRuntimes.begin(), chunkRuntimes.end(), 0)/this->evolutionCounter << endl;
-    cout << "mean runtime split (us):" << endl;
-    cout << (double)accumulate(splitRuntimes.begin(), splitRuntimes.end(), 0)/this->evolutionCounter << endl;
+    double numCrossovers = this->evolutionCounter * (this->population_count - this->elite_size);
+    
+    cout << "num crossovers was " << numCrossovers << endl;
+    
+    double accRnd = (double)accumulate(rndRuntimes.begin(), rndRuntimes.end(), 0) / (double)1e9;
+    double accChunk = (double)accumulate(chunkRuntimes.begin(), chunkRuntimes.end(), 0) / (double)1e9;
+    double accSplit = (double)accumulate(splitRuntimes.begin(), splitRuntimes.end(), 0) / (double)1e9;
+    
+    cout << "mean runtime rnd (ns): (total runtime " << accRnd << "s)" << endl;
+    cout << (double)accumulate(rndRuntimes.begin(), rndRuntimes.end(), 0)/numCrossovers << endl;
+    cout << "mean runtime chunk (ns): (total runtime " << accChunk << "s)" << endl;
+    cout << (double)accumulate(chunkRuntimes.begin(), chunkRuntimes.end(), 0)/numCrossovers << endl;
+    cout << "mean runtime split (ns): (total runtime " << accSplit << "s)" << endl;
+    cout << (double)accumulate(splitRuntimes.begin(), splitRuntimes.end(), 0)/numCrossovers << endl;
     
     string rndRuntimesFile = "rndRuntimesFile.csv";
     string chunkRuntimesFile = "chunkRuntimesFile.csv";
@@ -261,256 +280,167 @@ double TravellingSalesmanProblem::evaluate_fitness(const int individual) {
 //  * take 50% of each parent as opposed to randomly taking a sequence
 //  *
 void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int* child) {
-    
-    bool useSIMD = false;
-    
-    
-    if (useSIMD) {
         
-        // TODO: align population
+    bool useSet = false;
+    
+    if(useSet == false) {
+
+#ifdef microbenchmark_breed
+        hrTime tStart, tEnd;
+        int delta;
         
-        // TODO: sample multiple random integers 2x
-        // TODO: use min, max
-        // leave this out for the moment as it seems to be much effort
+        tStart = myClock.now();
+#endif
+        
+        //selecting gene sequences to be carried over to child
         int geneA = this->rand_range(0, this->problem_size - 1);
         int geneB = this->rand_range(0, this->problem_size - 1);
         int startGene = min(geneA, geneB);
         int endGene = max(geneA, geneB);
         
-        // peel
-        int idx = startGene;
-        while(idx % 8 != 0 && idx <= endGene) {
-            child[idx] = this->population[parent1*this->problem_size + idx];
-            
-            idx = idx + 1;
+#ifdef microbenchmark_breed
+        tEnd = myClock.now();
+        delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+        rndRuntimes.push_back(delta);
+        
+        tStart = myClock.now();
+#endif
+        
+        /*
+         Experiment with mask.
+         */
+        
+        Int mask[problem_size]; // size of a single individual
+        for(int idx = 0; idx < problem_size; idx++) {
+            mask[idx] = 1;
         }
-        // chunks
-        __m256i simdChunk;
-        while(idx+8 <= endGene) {
-            simdChunk = _mm256_load_si256((__m256i *)&(this->population[parent1]));
-            _mm256_store_si256 ((__m256i *)&child[idx], simdChunk);
+        // cities are indexed 0, ..., (problem_size-1)
+        
             
-            idx = idx + 8;
-        }
-        // peel
-        while(idx <= endGene) {
-            child[idx] = this->population[parent1*this->problem_size + idx];
-            
-            idx = idx + 1;
+        for (int i = startGene; i <= endGene; ++i) {
+            child[i] = POP(parent1, i);
+            //assertm(0 <= POP(parent1, i) && POP(parent1, i) <= problem_size-1, "segfault mask, loop chunk");
+            //assertm(mask[POP(parent1, i)] == 1, "gene part is already masked, loop chunk");
+            mask[POP(parent1, i)] = 0; // no comparisons
         }
         
+        /*int sum = 0;
+        for(int i = 0; i < problem_size; i++) {
+            sum += mask[i];
+        }
+        assertm(sum == problem_size - ((endGene-startGene)+1), "num elements masked differs from num elements in chunk");*/
         
-                
-        // TODO: extract subarray
-        // masking maybe?
-        
-        // TODO: extract disjoint indices
-        
-        
-    } else {
-        
-        bool useSet = false;
-        
-        if(useSet == false) {
+#ifdef microbenchmark_breed
+        tEnd = myClock.now();
+        delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+        chunkRuntimes.push_back(delta);
 
-#ifdef microbenchmark_breed
-            hrTime tStart, tEnd;
-            int delta;
-            
-            tStart = myClock.now();
+        tStart = myClock.now();
 #endif
         
-            //selecting gene sequences to be carried over to child
-            int geneA = this->rand_range(0, this->problem_size - 1);
-            int geneB = this->rand_range(0, this->problem_size - 1);
-            int startGene = min(geneA, geneB);
-            int endGene = max(geneA, geneB);
+        int parent2idx = 0;
         
-#ifdef microbenchmark_breed
-            tEnd = myClock.now();
-            delta = std::chrono::duration_cast<hrMillies>(tEnd - tStart).count();
-            rndRuntimes.push_back(delta);
-            
-            tStart = myClock.now();
-#endif
+        for(int childIdx = 0; childIdx < startGene;) {
+            child[childIdx] = POP(parent2, parent2idx);
+            childIdx = childIdx + (1 & mask[POP(parent2, parent2idx)]);
+            parent2idx++;
+        }
         
-            /*
-             Experiment with mask.
-             */
+        for(int childIdx = endGene+1; childIdx < problem_size;) {
+            child[childIdx] = POP(parent2, parent2idx);
+            childIdx = childIdx + (1 & mask[POP(parent2, parent2idx)]);
+            parent2idx++;
+        }
             
-            int mask[problem_size]; // size of a single individual
-            for(int idx = 0; idx < problem_size; idx++) {
-                mask[idx] = 1;
+            
+        /*bool sthswrong = false;
+        
+        for(int i = 0; i < problem_size; i++) {
+            bool contained = false;
+            for(int j = 0; j < problem_size; j++) {
+                if(child[j] == i) {
+                    contained = true;
+                }
             }
-            // cities are indexed 0, ..., (problem_size-1)
-            
-                
-            for (int i = startGene; i <= endGene; ++i) {
-                child[i] = POP(parent1, i);
-                //assertm(0 <= POP(parent1, i) && POP(parent1, i) <= problem_size-1, "segfault mask, loop chunk");
-                //assertm(mask[POP(parent1, i)] == 1, "gene part is already masked, loop chunk");
-                mask[POP(parent1, i)] = 0; // no comparisons
+            if(!contained) {
+                //assertm(false, "error, child misses at least one gene element");
+                sthswrong = true;
             }
-            
-            /*int sum = 0;
+        }
+        
+        if(sthswrong) {
+            cout << "-----------------------" << endl;
             for(int i = 0; i < problem_size; i++) {
-                sum += mask[i];
-            }
-            assertm(sum == problem_size - ((endGene-startGene)+1), "num elements masked differs from num elements in chunk");*/
+                cout << child[i] << " ";
+            } cout << endl;
+            cout << "-----------------------" << endl;
+            exit(1);
+        }*/
+        
         
 #ifdef microbenchmark_breed
-            tEnd = myClock.now();
-            delta = std::chrono::duration_cast<hrMillies>(tEnd - tStart).count();
-            chunkRuntimes.push_back(delta);
-
-            tStart = myClock.now();
+        tEnd = myClock.now();
+        delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+        splitRuntimes.push_back(delta);
 #endif
         
-            int parent2idx = 0;
-            
-            for(int childIdx = 0; childIdx < startGene;) {
-                child[childIdx] = POP(parent2, parent2idx);
-                childIdx = childIdx + (1 & mask[POP(parent2, parent2idx)]);
-                parent2idx++;
-            }
-            
-            for(int childIdx = endGene+1; childIdx < problem_size;) {
-                child[childIdx] = POP(parent2, parent2idx);
-                childIdx = childIdx + (1 & mask[POP(parent2, parent2idx)]);
-                parent2idx++;
-            }
-            
-            
-            /*int parent2idx = 0;
-            
-            for(int childIdx = 0; childIdx < startGene; childIdx++) {
-                while(mask[POP(parent2, parent2idx)] == 1) {
-                    parent2idx++;
-                }
-                child[childIdx] = POP(parent2, parent2idx);
-                parent2idx++;
-            }
-            
-            for(int childIdx = endGene+1; childIdx < problem_size; childIdx++) {
-                while(mask[POP(parent2, parent2idx)] == 1) {
-                    parent2idx++;
-                }
-                child[childIdx] = POP(parent2, parent2idx);
-                parent2idx++;
-            }*/
-            
-            
-            /*int childIdx = 0;
-            
-            for(int parent2idx = 0; parent2idx < problem_size; parent2idx++) { // iterate over parent2
-                
-                if(childIdx == startGene) {
-                    childIdx = endGene + 1;
-                    if(childIdx == problem_size) break;
-                    // because this can fail if startGene == endGene == problem_size-1
-                }
-                
-                //assertm(0 <= POP(parent2, parent2idx) && POP(parent2, parent2idx) <= problem_size-1, "segfault mask, loop split");
-                if(mask[POP(parent2, parent2idx)] == 1) {
-                    //cout << childIdx << endl;
-                    //assertm(0 <= childIdx && childIdx <= problem_size-1, "segfault child");
-                    child[childIdx] = POP(parent2, parent2idx);
-                    childIdx++;
-                }
-                
-            }*/
-            
-            
-            /*bool sthswrong = false;
-            
-            for(int i = 0; i < problem_size; i++) {
-                bool contained = false;
-                for(int j = 0; j < problem_size; j++) {
-                    if(child[j] == i) {
-                        contained = true;
-                    }
-                }
-                if(!contained) {
-                    //assertm(false, "error, child misses at least one gene element");
-                    sthswrong = true;
-                }
-            }
-            
-            if(sthswrong) {
-                cout << "-----------------------" << endl;
-                for(int i = 0; i < problem_size; i++) {
-                    cout << child[i] << " ";
-                } cout << endl;
-                cout << "-----------------------" << endl;
-                exit(1);
-            }*/
-        
-        
-#ifdef microbenchmark_breed
-            tEnd = myClock.now();
-            delta = std::chrono::duration_cast<hrMillies>(tEnd - tStart).count();
-            splitRuntimes.push_back(delta);
-#endif
-        
-        } else { // useSet == true;
+    } else { // useSet == true;
             
 #ifdef microbenchmark_breed
-            hrTime tStart, tEnd;
-            int delta;
-            
-            tStart = myClock.now();
+        hrTime tStart, tEnd;
+        int delta;
+        
+        tStart = myClock.now();
 #endif
                     
-            //selecting gene sequences to be carried over to child
-            int geneA = this->rand_range(0, this->problem_size - 1);
-            int geneB = this->rand_range(0, this->problem_size - 1);
-            int startGene = min(geneA, geneB);
-            int endGene = max(geneA, geneB);
+        //selecting gene sequences to be carried over to child
+        int geneA = this->rand_range(0, this->problem_size - 1);
+        int geneB = this->rand_range(0, this->problem_size - 1);
+        int startGene = min(geneA, geneB);
+        int endGene = max(geneA, geneB);
                     
 #ifdef microbenchmark_breed
-            tEnd = myClock.now();
-            delta = std::chrono::duration_cast<hrMillies>(tEnd - tStart).count();
-            rndRuntimes.push_back(delta);
-            
-            tStart = myClock.now();
+        tEnd = myClock.now();
+        delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+        rndRuntimes.push_back(delta);
+        
+        tStart = myClock.now();
 #endif
             
-            set<Int> selected;
-            
-            for (int i = startGene; i <= endGene; ++i) {
-                VAL_POP(parent1, i);
-                child[i] = POP(parent1, i);
-                selected.insert(POP(parent1, i));
-            }
-            
+        set<Int> selected;
+        
+        for (int i = startGene; i <= endGene; ++i) {
+            VAL_POP(parent1, i);
+            child[i] = POP(parent1, i);
+            selected.insert(POP(parent1, i));
+        }
+        
 #ifdef microbenchmark_breed
-            tEnd = myClock.now();
-            delta = std::chrono::duration_cast<hrMillies>(tEnd - tStart).count();
-            chunkRuntimes.push_back(delta);
-            
-            tStart = myClock.now();
+        tEnd = myClock.now();
+        delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+        chunkRuntimes.push_back(delta);
+
+        tStart = myClock.now();
 #endif
-            
-            int index = 0;
-            for (int i = 0; i < this->problem_size; ++i) {
-                // If not already chosen that city
-                VAL_POP(parent2, i);
-                if (selected.find(POP(parent2, i)) == selected.end()) {
-                    if (index == startGene) {
-                        index = endGene + 1;
-                    }
-                    child[index] = POP(parent2, i);
-                    index++;
+        
+        int index = 0;
+        for (int i = 0; i < this->problem_size; ++i) {
+            // If not already chosen that city
+            VAL_POP(parent2, i);
+            if (selected.find(POP(parent2, i)) == selected.end()) {
+                if (index == startGene) {
+                    index = endGene + 1;
                 }
+                child[index] = POP(parent2, i);
+                index++;
             }
+        }
             
 #ifdef microbenchmark_breed
-            tEnd = myClock.now();
-            delta = std::chrono::duration_cast<hrMillies>(tEnd - tStart).count();
-            splitRuntimes.push_back(delta);
+        tEnd = myClock.now();
+        delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+        splitRuntimes.push_back(delta);
 #endif
-            
-        } // end if else
         
     } // end if else
     
@@ -519,15 +449,12 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
 void TravellingSalesmanProblem::breed_population() {
     this->logger->LOG_WC(BREED_POPULATION_BEGIN);
     
-    // TODO: do this in-place
-    // in order to speed things up
     Int temp_population[this->population_count][this->problem_size];
 
     // Keep the best individuals
     for (int i = 0; i < this->elite_size; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             temp_population[i][j] = POP(this->ranks[i], j);
-            //population[i][j] = POP(this->ranks[i], j);
         }
     }
 
@@ -543,7 +470,6 @@ void TravellingSalesmanProblem::breed_population() {
         int rand1 = dist(gen);
         int rand2 = dist(gen);
         this->breed(rand1, rand2, temp_population[i]);
-        //this->breed(rand1, rand2, &(this->population[i*problem_size]));
     }
 
     /*for (int i = 0; i < this->population_count; ++i) {
@@ -556,36 +482,17 @@ void TravellingSalesmanProblem::breed_population() {
 }
 
 void TravellingSalesmanProblem::mutate(const int individual) {
-    
-    bool useSIMD = false;
-    
-    
-    if(useSIMD) {
-        
-        __m256i simdMutationRate = _mm256_set1_epi32(this->mutation_rate);
-        
-        // TODO: random simd vector
-        // faster check  i
-        
-        // unaligned load & unaligned store
-        
-        
-    } else {
-    
-        if (rand() % this->mutation_rate == 0) {
-            int swap = rand_range(0, this->problem_size - 1);
-            int swap_with = rand_range(0, this->problem_size - 1);
+    if (rand() % this->mutation_rate == 0) {
+        int swap = rand_range(0, this->problem_size - 1);
+        int swap_with = rand_range(0, this->problem_size - 1);
 
-            VAL_POP(individual, swap);
-            VAL_POP(individual, swap_with);
-            int city1 = POP(individual, swap);
-            int city2 = POP(individual, swap_with);
-            POP(individual, swap) = city2;
-            POP(individual, swap_with) = city1;
-        }
-    
+        VAL_POP(individual, swap);
+        VAL_POP(individual, swap_with);
+        int city1 = POP(individual, swap);
+        int city2 = POP(individual, swap_with);
+        POP(individual, swap) = city2;
+        POP(individual, swap_with) = city1;
     }
-    
 }
 
 void TravellingSalesmanProblem::mutate_population() {
