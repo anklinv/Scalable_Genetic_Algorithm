@@ -456,6 +456,18 @@ void TravellingSalesmanProblem::rank_individuals() {
     this->logger->LOG_WC(RANK_INDIVIDUALS_END);
 }
 
+
+void print256_bitset(__m256i var) {
+    
+    uint32_t *val = (uint32_t*) &var;
+    
+    cout << bitset<32>(val[0]) << " " << bitset<32>(val[1]) << " "
+        << bitset<32>(val[2]) << " " << bitset<32>(val[3]) << " "
+        << bitset<32>(val[4]) << " " << bitset<32>(val[5]) << " "
+        << bitset<32>(val[6]) << " " << bitset<32>(val[7]) << endl;
+}
+
+
 Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     
     // size of this part of the working set is:
@@ -463,18 +475,19 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     
     
     // TODO: begin SIMD version
+    // compute how many mask elements are covered by a __m256i
     const int INC_GENE = (256 / 8) / sizeof(Int); // bytes
-    
-    Real sumDistance = 0;
-    __m256 sumDistanceSIMD = _mm256_set1_ps(0);
+        
+    Real sumDistances = 0;
+    __m256 sumDistancesSIMD = _mm256_set1_ps(0);
     
     // indices for distance matrix lookup
-    __m256i geneSegSIMD;
-    __m256i geneSegShiftedSIMD;
+    //__m256i geneSegSIMD;
+    //__m256i geneSegShiftedSIMD;
     
-    const __m256 PROBLEM_SIZE_SIMD = _mm256_set1_epi32(problem_size);
+    const __m256i PROBLEM_SIZE_SIMD = _mm256_set1_epi32(problem_size);
     
-    __m256 offsetSIMD;
+    __m256i offsetsSIMD;
     
     // distances of the current gene segment
     // (8 indices means 7 distances)
@@ -485,16 +498,16 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     
     int geneIdx = 0;
     
-    for(; geneIdx <= (problem_size - 8); geneIdx = geneIdx + (INC_GENE - 1)) {
+    for(; geneIdx <= (problem_size - INC_GENE); geneIdx = geneIdx + (INC_GENE - 1)) {
         
-        geneSegSIMD = _mm256_load_si256((__m256i *)&POP(individual, geneIdx));
+        __m256i geneSegSIMD = _mm256_load_si256((__m256i *)&POP(individual, geneIdx));
         
         // shift 128-bit lanes to the left by 32 bit
         // 7 6 5 4 3 2 1 0 => 6 5 4 x 2 1 0 x (x padded with zeros)
         // use extract to recover 3
         int geneSegIdx3 = _mm256_extract_epi32(geneSegSIMD, 3);
         
-        geneSegShiftedSIMD = _mm256_slli_si256(geneSegSIMD, 32);
+        __m256i geneSegShiftedSIMD = _mm256_slli_si256(geneSegSIMD, 4);
         
         __m256i geneSegIdx3SIMD = _mm256_set1_epi32(geneSegIdx3);
         geneSegIdx3SIMD = _mm256_and_si256(geneSegIdx3SIMD, geneSegIdx3MaskSIMD);
@@ -506,7 +519,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
         // 7 6 5 4 3 2 1 0 geneSegSIMD
         
         offsetsSIMD = _mm256_mullo_epi32(geneSegShiftedSIMD, PROBLEM_SIZE_SIMD); // super slow
-        offsetsSIMD = _mm256_add_epi32(offsetSIMD, geneSegSIMD);
+        offsetsSIMD = _mm256_add_epi32(offsetsSIMD, geneSegSIMD);
         
         // make sure cities is aligned to 32 in memory
         distancesSIMD = _mm256_i32gather_epi32(cities, offsetsSIMD, 4);
@@ -514,34 +527,35 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
         // 6-7 5-6 4-5 3-4 2-3 1-2 0-1 x
         
         // simultaneous add to SIMD sum
-        sumDistanceSIMD = _mm256_add_ps(sumDistanceSIMD, distancesSIMD);
+        sumDistancesSIMD = _mm256_add_ps(sumDistancesSIMD, distancesSIMD);
     }
     
     // ok ok ok ok ok ok ok garbage
     // (use mask to eliminate garbage)
     __m256i garbageMaskSIMD = _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
                                              0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0);
-    sumDistanceSIMD = _mm256_and_si256(sumDistanceSIMD, garbageMaskSIMD);
+    sumDistancesSIMD = _mm256_and_si256(sumDistancesSIMD, garbageMaskSIMD);
         
     // compute horizontal sum
-    sumSIMD = _mm256_hadd_ps(sumSIMD, sumSIMD); // sums of 2 candidates
-    sumSIMD = _mm256_hadd_ps(sumSIMD, sumSIMD); // sums of 4 candidates
+    sumDistancesSIMD = _mm256_hadd_ps(sumDistancesSIMD, sumDistancesSIMD); // sums of 2 candidates
+    sumDistancesSIMD = _mm256_hadd_ps(sumDistancesSIMD, sumDistancesSIMD); // sums of 4 candidates
     
-    Real sumLowH = _mm256_cvtss_f32(sumSIMD);
-    sumDistance += sumLowH;
+    Real sumLowH = _mm256_cvtss_f32(sumDistancesSIMD);
+    sumDistances += sumLowH;
     
-    Real sumHighH = _mm256_cvtss_f32(_mm256_permute2f128_ps(sumSIMD, sumSIMD, 1));
-    sumDistance += sumHighH;
+    Real sumHighH = _mm256_cvtss_f32(_mm256_permute2f128_ps(sumDistancesSIMD, sumDistancesSIMD, 1));
+    sumDistances += sumHighH;
     
     // scalar loop for residual
     for(; geneIdx < (problem_size - 1); geneIdx++) {
-        sumDistance += DIST(POP(individual, geneIdx), POP(individual, geneIdx + 1));
+        sumDistances += DIST(POP(individual, geneIdx), POP(individual, geneIdx + 1));
     }
+    return sumDistances;
     // TODO: end SIMD version
     
     
     // TODO: start sequential version
-    Real route_distance = 0.0;
+    /*Real route_distance = 0.0;
     
     for (int j = 0; j < this->problem_size - 1; ++j) {
         VAL_POP(individual, j);
@@ -553,22 +567,17 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     VAL_POP(individual, this->problem_size - 1);
     VAL_POP(individual, 0);
     VAL_DIST(POP(individual, this->problem_size - 1), POP(individual, 0));
-    route_distance += DIST(POP(individual, this->problem_size - 1), POP(individual, 0)); //complete the round trip
+    
+    //assertm(sumDistances == route_distance, "computed distance is not correct");
+    
+    route_distance += DIST(POP(individual, this->problem_size - 1), POP(individual, 0)); //complete the round trip*/
     // TODO: end sequential version
     
-    return route_distance;
+    //return route_distance;
 }
 
 
-void print256_bitset(__m256i var) {
-    
-    uint32_t *val = (uint32_t*) &var;
-    
-    cout << val[0] << " " << val[1] << " "
-        << val[2] << " " << val[3] << " "
-        << val[4] << " " << val[5] << " "
-        << val[6] << " " << val[7] << endl;
-}
+
 
 //this function takes up the most time in an epoch
 //possible solutions:
