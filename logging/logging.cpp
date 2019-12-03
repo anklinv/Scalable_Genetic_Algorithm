@@ -21,8 +21,6 @@ Logger::Logger(std::string dir, int rank, time_t *time) {
 }
 
 void Logger::open() {
-    this->fitness_file.open(this->filename_prefix + "_fitness.csv");
-    // this->fitness_file << "epoch, fitness" << std::endl;
     this->tag_file.open(this->filename_prefix + "_tags.bin", std::ios::out | std::ios::binary);
     log_tag_value(LOGGING_TAG_VERSION, LOGGING_VERSION);
     log_tag_value(LOGGING_TAG_CLOCKS_PER_SEC, CLOCKS_PER_SEC);
@@ -38,20 +36,6 @@ void Logger::close() {
     LOG_WC(LOGGING_END);
     LOG_CC(LOGGING_END);
     this->tag_file.close();
-}
-
-void Logger::log_all_fitness_per_epoch(int epoch, const std::vector<double>& fitness) {
-    this->fitness_file << epoch;
-    for (auto f : fitness) {
-        this->fitness_file << "," << f;
-    }
-    this->fitness_file << std::endl;
-}
-
-void Logger::log_best_fitness_per_epoch(int epoch, double fitness) {
-    this->fitness_file << epoch;
-    this->fitness_file << "," << fitness;
-    this->fitness_file << std::endl;
 }
 
 void Logger::log_tag_value(tag_t tag, tag_value_t value) {

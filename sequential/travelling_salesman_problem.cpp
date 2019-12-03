@@ -23,6 +23,9 @@
 #define POP(i,j) this->population[i * this->problem_size + j]
 #define DIST(i,j) this->cities[i * this->problem_size + j]
 
+// Enable this for microbenchmarks
+// #define log_microbenchmarks
+
 using namespace std;
 
 bool log_all_values = false;
@@ -213,14 +216,7 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
             }
         }
         this->evolve(rank);
-        
-        // - if the best fitness is logged, the best fitness before the previous evolution step is logged (due to ranking)
-        // - the best fitness after the very last evolution is not logged
-        if (log_all_values) {
-            this->logger->log_all_fitness_per_epoch(this->evolutionCounter, this->fitness);
-        } else if (log_best_value) {
-            this->logger->log_best_fitness_per_epoch(this->evolutionCounter, this->fitness_best);
-        }
+
 #ifdef debug
         // cout << "*** EPOCH " << epoch << " ***" << endl;
         rank_individuals();
@@ -244,7 +240,9 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
 }
 
 void TravellingSalesmanProblem::rank_individuals() {
+#ifdef log_microbenchmarks
     this->logger->LOG_WC(RANK_INDIVIDUALS_BEGIN);
+#endif
     this->fitness_sum = 0.0;
     this->fitness_best = std::numeric_limits<typeof(this->fitness_best)>::max();
     for (int i = 0; i < this->population_count; ++i) {
@@ -257,7 +255,9 @@ void TravellingSalesmanProblem::rank_individuals() {
     sort(this->ranks, this->ranks + this->population_count, [this] (int i, int j) {
        return this->fitness[i] < this->fitness[j];
     });
+#ifdef log_microbenchmarks
     this->logger->LOG_WC(RANK_INDIVIDUALS_END);
+#endif
 }
 
 double TravellingSalesmanProblem::evaluate_fitness(const int individual) {
@@ -447,8 +447,10 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
 }
 
 void TravellingSalesmanProblem::breed_population() {
+#ifdef log_microbenchmarks
     this->logger->LOG_WC(BREED_POPULATION_BEGIN);
-    
+#endif
+
     Int temp_population[this->population_count][this->problem_size];
 
     // Keep the best individuals
@@ -478,7 +480,9 @@ void TravellingSalesmanProblem::breed_population() {
             POP(i, j) = temp_population[i][j];
         }
     }
+#ifdef log_microbenchmarks
     this->logger->LOG_WC(BREED_POPULATION_END);
+#endif
 }
 
 void TravellingSalesmanProblem::mutate(const int individual) {
@@ -496,7 +500,9 @@ void TravellingSalesmanProblem::mutate(const int individual) {
 }
 
 void TravellingSalesmanProblem::mutate_population() {
+#ifdef log_microbenchmarks
     this->logger->LOG_WC(MUTATE_POPULATION_BEGIN);
+#endif
     
     for (int i = this->elite_size / 2; i < this->population_count; ++i) {
         
@@ -518,8 +524,10 @@ void TravellingSalesmanProblem::mutate_population() {
 #endif
         
     }
-    
+
+#ifdef log_microbenchmarks
     this->logger->LOG_WC(MUTATE_POPULATION_END);
+#endif
 }
 
 int TravellingSalesmanProblem::rand_range(const int &a, const int&b) {
