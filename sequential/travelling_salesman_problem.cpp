@@ -472,12 +472,12 @@ void TravellingSalesmanProblem::breed_population() {
         this->breed(rand1, rand2, temp_population[i]);
     }
 
-    /*for (int i = 0; i < this->population_count; ++i) {
+    for (int i = 0; i < this->population_count; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             VAL_POP(i, j);
             POP(i, j) = temp_population[i][j];
         }
-    }*/
+    }
     this->logger->LOG_WC(BREED_POPULATION_END);
 }
 
