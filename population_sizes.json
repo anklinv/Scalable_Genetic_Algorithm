@@ -1,34 +1,100 @@
 {
-  "name" : "test population sizes",
-  "repetitions" : 20,
+  "name" : "Population sizes scaling",
+  "repetitions" : 5,
   "fixed_params" : {
-	  "mode" : "sequential",
-    "-n" : 1,
-    "--elite_size": 16,
-    "--mutation": 16,
-    "--epochs": 5000,
-    "--migration_period": 200,
-    "--migration_amount": 5,
-    "--migration_topology": "fully_connected",
-    "--selection_policy": "tournament_selection",
-    "--replacement_policy": "truncation"
+    "mode" : "sequential",
+    "--mutation": 10,
+    "-n": 1
   },
   "variable_params" : {
-  	"--population" : {
-  		"type": "list",
-  		"list": [
-        512,
-        1024,
-        2048,
-        4096,
-        8192
-  		]
-  	},
-    "--data": {
-      "type": "list",
-      "list": [
-        "berlin52.csv",
-        "a280.csv"
+    "n_pop" : {
+      "type" : "tuple",
+      "names" : [
+        "--population",
+        "--elite_size",
+        "--epochs"
+      ],
+      "values" : [
+        {
+          "value" : [
+            4096,
+            2048,
+            4000
+          ]
+        },
+        {
+          "value" : [
+            2048,
+            1024,
+            8000
+          ]
+        },
+        {
+          "value" : [
+            1024,
+            512,
+            16000
+          ]
+        },
+        {
+          "value" : [
+            512,
+            256,
+            32000
+          ]
+        },
+        {
+          "value" : [
+            256,
+            128,
+            64000
+          ]
+        },
+        {
+          "value" : [
+            128,
+            64,
+            128000
+          ]
+        },
+        {
+          "value" : [
+            64,
+            32,
+            256000
+          ]
+        },
+        {
+          "value" : [
+            32,
+            16,
+            512000
+          ]
+        },
+        {
+          "value" : [
+            16,
+            8,
+            1024000
+          ]
+        },
+        {
+          "value" : [
+            8,
+            4,
+            2048000
+          ]
+        }
+      ]
+    },
+    "--data" : {
+      "type" : "list",
+      "list" : [
+        "a280.csv",
+        "bier127.csv",
+        "ch130.csv",
+        "d493.csv",
+        "att532.csv"
       ]
     }
   }
