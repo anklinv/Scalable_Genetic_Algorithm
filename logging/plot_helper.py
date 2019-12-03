@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
     if args.extract:
         print("Creating dataframe... ", end="", flush=True)
-        name = os.path.split(args.dir)[-1]
+        name = os.path.split(args.dir.strip("/").strip("\\"))[-1]
         df = generate_fitness_wc_dataframe(args.dir, name)
         print("Done!")
         print(f"Saved to {name}.gz")

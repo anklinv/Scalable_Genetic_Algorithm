@@ -222,7 +222,7 @@ if __name__ == "__main__":
                             time.sleep(1)
                     else:
                         # Do not retry too much
-                        time.sleep(15)
+                        time.sleep(5)
 
     if args.dry_run:
         print("You are about to schedule {} jobs".format(job_count))
