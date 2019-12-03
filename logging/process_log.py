@@ -47,13 +47,15 @@ class Log(object):
     Preferably use IDs instead.
         log_h: List<Tuple<string, int>>
     """
-    def __init__(self, fn: str, tags: Tags):
+    def __init__(self, fn: str, tags: Tags, verbose=0):
         self.fn = fn
         self.tags = tags
 
-        print(f'Parsing {self.fn}...', end='')
+        if verbose > 0:
+            print(f'Parsing {self.fn}...', end='')
         self.parse_log()
-        print(' done')
+        if verbose > 0:
+            print(' done')
         # print('log', self.log)
 
         self.make_human_readable()
@@ -233,6 +235,8 @@ def logs_in_dir(path):
 # Given a log_dir (generated with a leonhard run) and a name, saves a dataframe to name.gz
 # That dataframe contains the epochs, wall clock times, fitness, rep, rank and all the variable parameters
 def generate_fitness_wc_dataframe(log_dir, name, tag_loc="tags.hpp"):
+    from tqdm import tqdm
+
     assert isinstance(name, str), "name must be a string"
     assert os.path.isdir(log_dir), "log_dir must be a directory"
     assert os.path.isfile(tag_loc), f"Could not find tag_loc {tag_loc}"
@@ -258,7 +262,7 @@ def generate_fitness_wc_dataframe(log_dir, name, tag_loc="tags.hpp"):
     unique_names = list(set(map(lambda x: "_".join(x.split("_")[:-1]), all_names)))
 
     df = None
-    for run_name in unique_names:
+    for run_name in tqdm(unique_names):
         params = run_name.split("_")
 
         # Get parameter names
@@ -271,7 +275,7 @@ def generate_fitness_wc_dataframe(log_dir, name, tag_loc="tags.hpp"):
                 param_names.append(key)
         param_names = list(map(lambda x: x.replace("-", ""), param_names))
 
-        for repetition in range(repetitions):
+        for repetition in tqdm(range(repetitions)):
             folder_name = run_name + "_" + str(repetition)
             folder_contents = os.listdir(os.path.join(log_dir, folder_name))
             folder_contents = list(filter(lambda x: ".bin" in x, folder_contents))
