@@ -99,6 +99,8 @@ private:
     Real* fitness;
     Real fitness_sum;
     Real fitness_best;
+    
+    Real* fitnessWeights;
 
     /// Sorted ranks of individuals. i-th element is the index of the i-th best individual
     int* ranks;

@@ -43,6 +43,7 @@ vi splitRuntimes;
 hrClock myClock;
 
 vi sumAndMinRuntimes;
+vi evaluateRuntimes;
 vi sortRuntimes;
 
 /*
@@ -116,6 +117,10 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, Rea
     correctedSize = population_count * sizeof(Real);
     correctedSize = correctedSize - correctedSize % 32 + 32;
     this->fitness = (Real*)aligned_alloc(32, correctedSize);
+    
+    correctedSize = population_count * sizeof(Real);
+    correctedSize = correctedSize - correctedSize % 32 + 32;
+    this->fitnessWeights = (Real*)aligned_alloc(32, correctedSize);
     // end SIMD version
     
     this->evolutionCounter = 0;
@@ -161,6 +166,7 @@ TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     
     double accSumAndMin = (double)accumulate(sumAndMinRuntimes.begin(), sumAndMinRuntimes.end(), 0) / (double)1e9;
     double accSort = (double)accumulate(sortRuntimes.begin(), sortRuntimes.end(), 0) / (double)1e9;
+    double accEvaluate = (double)accumulate(evaluateRuntimes.begin(), evaluateRuntimes.end(), 0) / (double)1e9;
     
     cout << "accumulated runtime rank: " << accRuntimeRank / (double)1e9 << "s" << endl;
     cout << "accumulated runtime breed: " << accRuntimeBreed / (double)1e9 << "s" << endl;
@@ -170,6 +176,7 @@ TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     cout << "--------------------------" << endl;
     cout << "accumulated runtime sum and min: " << accSumAndMin << "s" << endl;
     cout << "accumulated runtime sort: " << accSort << "s" << endl;
+    cout << "accumulated runtime evaluate: " << accEvaluate << "s" << endl;
     cout << "--------------------------" << endl;
     
     cout << "(total accumulated runtime: " << (accRuntimeRank+accRuntimeBreed+accRuntimeMutate) / (double)1e9 << ")" << endl;
@@ -209,6 +216,7 @@ TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     delete this->temp_population;
     delete this->mask;
     delete this->fitness;
+    delete this->fitnessWeights;
     // end SIMD
     
     this->logger->close();
@@ -294,7 +302,7 @@ Real TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
     
 
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
-        this->logger->LOG_WC(EPOCH_BEGIN);
+        //this->logger->LOG_WC(EPOCH_BEGIN);
         if (this->verbose > 0) {
             if (epoch % this->log_iter_freq == 0) {
                 cout << epoch << " of " << nr_epochs << endl;
@@ -304,11 +312,11 @@ Real TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
         
         // - if the best fitness is logged, the best fitness before the previous evolution step is logged (due to ranking)
         // - the best fitness after the very last evolution is not logged
-        if (log_all_values) {
+        //if (log_all_values) {
             //this->logger->log_all_fitness_per_epoch(this->evolutionCounter, this->fitness);
-        } else if (log_best_value) {
-            this->logger->log_best_fitness_per_epoch(this->evolutionCounter, this->fitness_best);
-        }
+        //} else if (log_best_value) {
+        //    this->logger->log_best_fitness_per_epoch(this->evolutionCounter, this->fitness_best);
+        //}
 #ifdef debug
         // cout << "*** EPOCH " << epoch << " ***" << endl;
         rank_individuals();
@@ -321,8 +329,8 @@ Real TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
         }
 #endif
         this->evolutionCounter = this->evolutionCounter + 1;
-        this->logger->LOG(BEST_FITNESS, this->fitness_best);
-        this->logger->LOG_WC(EPOCH_END);
+        //this->logger->LOG(BEST_FITNESS, this->fitness_best);
+        //this->logger->LOG_WC(EPOCH_END);
     }
     
     // Island assumes the ranks to be sorted before a migration starts
@@ -345,7 +353,7 @@ Real TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
 
 
 void TravellingSalesmanProblem::rank_individuals() {
-    this->logger->LOG_WC(RANK_INDIVIDUALS_BEGIN);
+    //this->logger->LOG_WC(RANK_INDIVIDUALS_BEGIN);
     
     // TODO: profiling part
     hrTime tStart, tEnd;
@@ -374,6 +382,15 @@ void TravellingSalesmanProblem::rank_individuals() {
     for(int indivIdx = 0; indivIdx < population_count; indivIdx++) {
         fitness[indivIdx] = evaluate_fitness(indivIdx);
     }
+    
+    // TODO: profiling part
+    tEnd = myClock.now();
+    delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+    evaluateRuntimes.push_back(delta);
+    
+    tStart = myClock.now();
+    // TODO: profiling part
+    
     
     Real sumFitness = 0.0; // results to compute
     Real minFitness = MAX_REAL;
@@ -456,7 +473,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     sortRuntimes.push_back(delta);
     // TODO: profiling part
     
-    this->logger->LOG_WC(RANK_INDIVIDUALS_END);
+    //this->logger->LOG_WC(RANK_INDIVIDUALS_END);
 }
 
 
@@ -993,30 +1010,63 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
 }
 
 void TravellingSalesmanProblem::breed_population() {
-    this->logger->LOG_WC(BREED_POPULATION_BEGIN);
+    //this->logger->LOG_WC(BREED_POPULATION_BEGIN);
     
     // TODO: do this in-place
     // TODO: make this global (don't allocate, free, allocate, free, ... as this is "huge")
     // in order to speed things up
     //Int temp_population[this->population_count][this->problem_size];
     
+    
+    // TODO: start SIMD version
+    __m256i geneSegSIMD;
+    
+    int popIdx = 0;
+    for(; popIdx < elite_size; popIdx++) {
+        
+        int currIndividual = ranks[popIdx];
+        
+        int geneIdx = 0;
+        for(; geneIdx <= problem_size - 8; geneIdx = geneIdx + 8) {
+            geneSegSIMD = _mm256_load_si256((__m256i *)&POP(currIndividual, geneIdx));
+            _mm256_store_si256((__m256i *)&temp_population[popIdx*problem_size + geneIdx], geneSegSIMD);
+        }
+        for(; geneIdx < problem_size; geneIdx++) {
+            temp_population[popIdx*problem_size + geneIdx] = POP(currIndividual, geneIdx);
+        }
+    }
+    // TODO: end SIMD version
+    
 
+    // TODO: start sequential version
     // Keep the best individuals
-    for (int i = 0; i < this->elite_size; ++i) {
+    /*for (int i = 0; i < this->elite_size; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             //temp_population[i][j] = POP(this->ranks[i], j);
             // start SIMD version
+            //assert( temp_population[i*problem_size + j] == POP(this->ranks[i], j));
             temp_population[i*problem_size + j] = POP(this->ranks[i], j);
             // end SIMD version
             //population[i][j] = POP(this->ranks[i], j);
         }
-    }
+    }*/
+    // TODO: end sequential version
 
+    
+    // TODO: start SIMD version
+    
+    
+    // TODO: end SIMD version
+    
+    
+    // TODO: start sequential version
     vector<double> correct_fitness(this->population_count);
     for (int i = 0; i < this->population_count; ++i) {
         correct_fitness[i] = 1 / pow(this->fitness[i] / this->fitness_sum, 4);
     }
+    // TODO: end sequential version
 
+    
     auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());
 
     // Breed any random individuals
@@ -1030,13 +1080,13 @@ void TravellingSalesmanProblem::breed_population() {
         //this->breed(rand1, rand2, &(this->population[i*problem_size]));
     }
     
-    /*for (int i = 0; i < this->population_count; ++i) {
+    for (int i = 0; i < this->population_count; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             VAL_POP(i, j);
-            POP(i, j) = temp_population[i][j];
+            POP(i, j) = temp_population[i*problem_size + j];
         }
-    }*/
-    this->logger->LOG_WC(BREED_POPULATION_END);
+    }
+    //this->logger->LOG_WC(BREED_POPULATION_END);
     
 }
 
@@ -1076,7 +1126,7 @@ void TravellingSalesmanProblem::mutate(const int individual) {
 }
 
 void TravellingSalesmanProblem::mutate_population() {
-    this->logger->LOG_WC(MUTATE_POPULATION_BEGIN);
+    //this->logger->LOG_WC(MUTATE_POPULATION_BEGIN);
     
     for (int i = this->elite_size / 2; i < this->population_count; ++i) {
         
@@ -1099,7 +1149,7 @@ void TravellingSalesmanProblem::mutate_population() {
         
     }
     
-    this->logger->LOG_WC(MUTATE_POPULATION_END);
+    //this->logger->LOG_WC(MUTATE_POPULATION_END);
 }
 
 int TravellingSalesmanProblem::rand_range(const int &a, const int&b) {
