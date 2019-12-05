@@ -14,7 +14,8 @@ LIBDIR := -L/usr/local/cuda/lib64
 CUFLAGS= \
 -I. \
 -Xcompiler \
--fPIC
+-fPIC \
+-std=c++11
 
 LDFLAGS=-L. -lm -lpthread -lrt
 
