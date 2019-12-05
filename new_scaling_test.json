@@ -1,0 +1,148 @@
+{
+  "name" : "Population sizes scaling",
+  "repetitions" : 5,
+  "fixed_params" : {
+    "--mutation": 10,
+    "--data": "d1291.csv",
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "truncation",
+    "--replacement_policy": "truncation",
+    "mode": "island"
+  },
+  "variable_params" : {
+    "-migration_period" : {
+      "type" : "list",
+      "list" : [
+        1,
+        5,
+        100
+      ]
+    },
+    "n_pop" : {
+      "type" : "tuple",
+      "names" : [
+        "-n",
+        "--population",
+        "--elite_size",
+        "--epochs",
+        "--migration_amount"
+      ],
+      "values" : [
+          
+          
+        {
+          "value" : [
+            1,
+            32,
+            16,
+            1024000,
+            0
+          ]
+        },
+        {
+          "value" : [
+            2,
+            32,
+            16,
+            1024000,
+            1
+          ]
+        },
+        {
+          "value" : [
+            4,
+            32,
+            16,
+            1024000,
+            3
+          ]
+        },
+        {
+          "value" : [
+            8,
+            32,
+            16,
+            1024000,
+            7
+          ]
+        },
+        {
+          "value" : [
+            16,
+            32,
+            16,
+            1024000,
+            15
+          ]
+        },
+        {
+          "value" : [
+            32,
+            32,
+            16,
+            1024000,
+            31
+          ]
+        },
+  
+  
+        
+        {
+          "value" : [
+            1,
+            16,
+            8,
+            2048000,
+            0
+          ]
+        },
+        {
+          "value" : [
+            2,
+            16,
+            8,
+            2048000,
+            1
+          ]
+        },
+        {
+          "value" : [
+            4,
+            16,
+            8,
+            2048000,
+            3
+          ]
+        },
+        {
+          "value" : [
+            8,
+            16,
+            8,
+            2048000,
+            7
+          ]
+        },
+        {
+          "value" : [
+            16,
+            16,
+            8,
+            2048000,
+            15
+          ]
+        },
+        {
+          "value" : [
+            32,
+            16,
+            8,
+            2048000,
+            31
+          ]
+        }
+
+      ]
+    }
+  }
+}
