@@ -411,7 +411,7 @@ void TravellingSalesmanProblem::rank_individuals() {
 #endif
     
     // TODO: begin scalar version
-    this->fitness_sum = 0.0;
+    /*this->fitness_sum = 0.0;
     this->fitness_best = MAX_REAL;
     
     // min over range can be done efficiently using SIMD
@@ -423,13 +423,13 @@ void TravellingSalesmanProblem::rank_individuals() {
         this->fitness[i] = new_fitness;
         this->fitness_sum += new_fitness;
         this->fitness_best = min((double)this->fitness_best, (double)new_fitness);
-    }
+    }*/
     // TODO: end scalar version
     
     // TODO: begin SIMD version
-    /*for(int indivIdx = 0; indivIdx < population_count; indivIdx++) {
+    for(int indivIdx = 0; indivIdx < population_count; indivIdx++) {
         fitness[indivIdx] = evaluate_fitness(indivIdx);
-    }*/
+    }
     
 #ifdef microbenchmark_breed
     // TODO: profiling part
@@ -441,7 +441,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     // TODO: profiling part
 #endif
     
-    /*Real sumFitness = 0.0; // results to compute
+    Real sumFitness = 0.0; // results to compute
     Real minFitness = MAX_REAL;
     
     __m256 fitnessSegSIMD;
@@ -492,7 +492,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     //assertm(abs(minFitness - this->fitness_best) < 1e-5, "fitness min incorrect");
         
     this->fitness_best = minFitness;
-    this->fitness_sum = sumFitness;*/
+    this->fitness_sum = sumFitness;
     // TODO: end SIMD version
     
     //cout << "after segfault" << endl;
@@ -546,7 +546,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     // size of this part of the working set is:
     // sizeof(Real) * problem_size * problem_size
     
-    /*if(sizeof(Int) == 4) { // 32-bit version
+    if(sizeof(Int) == 4) { // 32-bit version
         // TODO: begin SIMD version
         // compute how many mask elements are covered by a __m256i
         const int INC_GENE = (256 / 8) / sizeof(Int); // bytes
@@ -650,12 +650,12 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
         
         
         // TODO: end SIMD version
-    }*/
+    }
     
     
     
     // TODO: start sequential version
-    Real route_distance = 0.0;
+    /*Real route_distance = 0.0;
     
     for (int j = 0; j < this->problem_size - 1; ++j) {
         VAL_POP(individual, j);
@@ -672,7 +672,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     
     //assertm(sumDistances == route_distance, "computed distance is not correct");
     
-    return route_distance;
+    return route_distance;*/
     // TODO: end sequential version
 }
 
@@ -690,7 +690,7 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
     if (useSIMD) {
     } else {
         
-        bool useSet = true;
+        bool useSet = false;
         
         if(useSet == false) {
 
@@ -720,15 +720,15 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
              */
             
             // TODO: start sequential version
-            //int mask[problem_size]; // size of a single individual
+            /*int mask[problem_size]; // size of a single individual
             for(int idx = 0; idx < problem_size; idx++) {
                 mask[idx] = 1;
-            }
+            }*/
             // cities are indexed 0, ..., (problem_size-1)
             // TODO: end sequential version
             
             // TODO: start SIMD version
-            /*// compute how many mask elements are covered by a __m256i
+            // compute how many mask elements are covered by a __m256i
             const int INC_MASK = (256 / 8) / sizeof(Int); // bytes
             
             const __m256i ALL_BITS_SET_SIMD = _mm256_set1_epi32(0xFFFFFFFF);
@@ -744,22 +744,22 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
             
             for(; maskIdx < problem_size; maskIdx++) {
                 mask[maskIdx] = ALL_BITS_SET;
-            }*/
+            }
             // TODO: end SIMD version
             
             // TODO: start sequential version
-            for (int i = startGene; i <= endGene; ++i) {
+            /*for (int i = startGene; i <= endGene; ++i) {
                 // when running this version it is super important to use the
                 // local mask array
                 child[i] = POP(parent1, i);
                 //assertm(0 <= POP(parent1, i) && POP(parent1, i) <= problem_size-1, "segfault mask, loop chunk");
                 //assertm(mask[POP(parent1, i)] == 0xFFFFFFFF, "gene part is already masked, loop chunk");
                 mask[POP(parent1, i)] = 0x00000000;
-            }
+            }*/
             // TODO: end sequential version
             
             // TODO: start SIMD version
-            /*if(sizeof(Int) == 4) {
+            if(sizeof(Int) == 4) {
                 
                 const int ALL_BITS_ZERO = 0x00000000;
                 
@@ -857,7 +857,7 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
                     child[geneIdx] = geneSeg;
                     mask[geneSeg] = ALL_BITS_ZERO;
                 }
-            }*/
+            }
             // TODO: end SIMD version
             
             /*int sum = 0;
@@ -1103,7 +1103,7 @@ void TravellingSalesmanProblem::breed_population() {
 #endif
     
     
-    /*if(sizeof(Int) == 4) { // 32-bit version
+    if(sizeof(Int) == 4) { // 32-bit version
         // TODO: start SIMD version
         __m256i geneSegSIMD;
         int popIdx = 0;
@@ -1135,10 +1135,10 @@ void TravellingSalesmanProblem::breed_population() {
             }
         }
         // TODO: end SIMD version
-    }*/
+    }
 
     // TODO: start scalar version
-    // Keep the best individuals
+    /*// Keep the best individuals
     for (int i = 0; i < this->elite_size; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             //temp_population[i][j] = POP(this->ranks[i], j);
@@ -1148,7 +1148,7 @@ void TravellingSalesmanProblem::breed_population() {
             // end SIMD version
             //population[i][j] = POP(this->ranks[i], j);
         }
-    }
+    }*/
     // TODO: end scalar version
 
 
@@ -1162,7 +1162,7 @@ void TravellingSalesmanProblem::breed_population() {
     
     
     // TODO: start SIMD version
-    /*__m256 fitnessWeightsSIMD;
+    __m256 fitnessWeightsSIMD;
     
     const __m256 ONES_SIMD = _mm256_set1_ps(Real(1.0));
     Real fitnessConstant = Real(1) / fitness_sum;
@@ -1186,12 +1186,12 @@ void TravellingSalesmanProblem::breed_population() {
         fitnessWeights[indivIdx] = pow(fitnessWeights[indivIdx], 4);
         fitnessWeights[indivIdx] = 1.0 / fitnessWeights[indivIdx];
     }
-    auto dist = std::discrete_distribution<>(fitnessWeights, fitnessWeights + population_count);*/
+    auto dist = std::discrete_distribution<>(fitnessWeights, fitnessWeights + population_count);
     // TODO: end SIMD version
     
     
     // TODO: start scalar version
-    vector<double> correct_fitness(this->population_count);
+    /*vector<double> correct_fitness(this->population_count);
     //double fc = 1.0 / this->fitness_sum;
     for (int i = 0; i < this->population_count; ++i) {
         correct_fitness[i] = 1 / pow(this->fitness[i] / this->fitness_sum, 4);
@@ -1200,7 +1200,7 @@ void TravellingSalesmanProblem::breed_population() {
         //assert(abs(tmp - fitnessWeights[i]) / tmp < 1e-5);
     }
     
-    auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());
+    auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());*/
     // TODO: end scalar version
 
     
@@ -1244,7 +1244,7 @@ void TravellingSalesmanProblem::breed_population() {
     tStart = myClock.now();
 #endif
     
-    /*if(sizeof(Int) == 4) { // 32-bit version
+    if(sizeof(Int) == 4) { // 32-bit version
         // TODO: start SIMD version
         __m256i geneSegSIMD;
         int popIdx = 0;
@@ -1274,17 +1274,17 @@ void TravellingSalesmanProblem::breed_population() {
             }
         }
         // TODO: end SIMD version
-    }*/
+    }
     
     
     // TODO: start scalar version
-    for (int i = 0; i < this->population_count; ++i) {
+    /*for (int i = 0; i < this->population_count; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             VAL_POP(i, j);
             //assert(POP(i, j) == temp_population[i*problem_size + j]);
             POP(i, j) = temp_population[i*problem_size + j];
         }
-    }
+    }*/
     // TODO: end scalar version
     
     //this->logger->LOG_WC(BREED_POPULATION_END);
