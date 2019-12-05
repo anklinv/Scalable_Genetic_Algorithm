@@ -36,6 +36,7 @@ bool log_best_value = true;
  For microbenchmarking.
  */
 
+#ifdef microbenchmark_breed
 vi rndRuntimes;
 vi chunkRuntimes;
 vi splitRuntimes;
@@ -52,6 +53,7 @@ vi breedRest;
 vi writeBack;
 
 vi sampleFromCorrected;
+#endif
 
 /*
  For debugging.
@@ -63,14 +65,15 @@ vi sampleFromCorrected;
  For profiling.
  */
 
+#ifdef microbenchmark_breed
 double accRuntimeRank = 0;
 double accRuntimeBreed = 0;
 double accRuntimeMutate = 0;
 
 double runtimeSolve = 0;
+#endif
 
-
-TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, Real* cities,
+TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, float* cities,
         const int population_count, const int elite_size, const int mutation_rate, const int verbose) {
     
     this->verbose = verbose;
@@ -155,7 +158,6 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, Rea
 TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     
 #ifdef microbenchmark_breed
-    
     double numCrossovers = this->evolutionCounter * (this->population_count - this->elite_size);
     
     cout << "num crossovers was " << numCrossovers << endl;
@@ -259,22 +261,34 @@ void TravellingSalesmanProblem::set_logger(Logger *_logger) {
 void TravellingSalesmanProblem::evolve(const int rank) {
     
     hrTime tStart, tEnd;
-        
+ 
+#ifdef microbenchmark_breed
     // Compute fitness
     // TODO: Profiling start
     tStart = myClock.now();
+#endif
+    
     this->rank_individuals();
+
+#ifdef microbenchmark_breed
     tEnd = myClock.now();
     accRuntimeRank += std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
     // TODO: Profiling end
+#endif
     
+#ifdef microbenchmark_breed
     // Breed children
     // TODO: Profiling start
     tStart = myClock.now();
+#endif
+    
     this->breed_population();
+    
+#ifdef microbenchmark_breed
     tEnd = myClock.now();
     accRuntimeBreed += std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
     // TODO: Profiling end
+#endif
     
     // Mutate population
 #ifdef debug_evolve
@@ -287,12 +301,18 @@ void TravellingSalesmanProblem::evolve(const int rank) {
     }
 #endif
 
+#ifdef microbenchmark_breed
     // TODO: PROFILING start
     tStart = myClock.now();
+#endif
+    
     this->mutate_population();
+    
+#ifdef microbenchmark_breed
     tEnd = myClock.now();
     accRuntimeMutate += std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
     // TODO: PROFILING end
+#endif
     
 #ifdef debug_evolve
     cout << "After:" << endl;
@@ -318,14 +338,15 @@ Real TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
     }
 #endif*/
     
+#ifdef microbenchmark_breed
     // TODO: Profiling start
     hrTime tStart, tEnd;
     tStart = myClock.now();
     // TODO: Profiling end
-    
+#endif
 
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
-        //this->logger->LOG_WC(EPOCH_BEGIN);
+        this->logger->LOG_WC(EPOCH_BEGIN);
         if (this->verbose > 0) {
             if (epoch % this->log_iter_freq == 0) {
                 cout << epoch << " of " << nr_epochs << endl;
@@ -352,18 +373,20 @@ Real TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
         }
 #endif
         this->evolutionCounter = this->evolutionCounter + 1;
-        //this->logger->LOG(BEST_FITNESS, this->fitness_best);
-        //this->logger->LOG_WC(EPOCH_END);
+        this->logger->LOG(BEST_FITNESS, this->fitness_best);
+        this->logger->LOG_WC(EPOCH_END);
     }
     
     // Island assumes the ranks to be sorted before a migration starts
     this->rank_individuals();
     
+#ifdef microbenchmark_breed
     // TODO: profiling start
     tEnd = myClock.now();
     runtimeSolve += std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
     // TODO: profiling end
-
+#endif
+    
     return this->fitness_best;
 }
 
@@ -378,15 +401,17 @@ Real TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
 void TravellingSalesmanProblem::rank_individuals() {
     //this->logger->LOG_WC(RANK_INDIVIDUALS_BEGIN);
     
+#ifdef microbenchmark_breed
     // TODO: profiling part
     hrTime tStart, tEnd;
     int delta;
     
     tStart = myClock.now();
     // TODO: profiling part
+#endif
     
     // TODO: begin scalar version
-    /*this->fitness_sum = 0.0;
+    this->fitness_sum = 0.0;
     this->fitness_best = MAX_REAL;
     
     // min over range can be done efficiently using SIMD
@@ -398,14 +423,15 @@ void TravellingSalesmanProblem::rank_individuals() {
         this->fitness[i] = new_fitness;
         this->fitness_sum += new_fitness;
         this->fitness_best = min((double)this->fitness_best, (double)new_fitness);
-    }*/
+    }
     // TODO: end scalar version
     
     // TODO: begin SIMD version
-    for(int indivIdx = 0; indivIdx < population_count; indivIdx++) {
+    /*for(int indivIdx = 0; indivIdx < population_count; indivIdx++) {
         fitness[indivIdx] = evaluate_fitness(indivIdx);
-    }
+    }*/
     
+#ifdef microbenchmark_breed
     // TODO: profiling part
     tEnd = myClock.now();
     delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
@@ -413,9 +439,9 @@ void TravellingSalesmanProblem::rank_individuals() {
     
     tStart = myClock.now();
     // TODO: profiling part
+#endif
     
-    
-    Real sumFitness = 0.0; // results to compute
+    /*Real sumFitness = 0.0; // results to compute
     Real minFitness = MAX_REAL;
     
     __m256 fitnessSegSIMD;
@@ -466,11 +492,12 @@ void TravellingSalesmanProblem::rank_individuals() {
     //assertm(abs(minFitness - this->fitness_best) < 1e-5, "fitness min incorrect");
         
     this->fitness_best = minFitness;
-    this->fitness_sum = sumFitness;
+    this->fitness_sum = sumFitness;*/
     // TODO: end SIMD version
     
     //cout << "after segfault" << endl;
     
+#ifdef microbenchmark_breed
     // TODO: profiling part
     tEnd = myClock.now();
     delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
@@ -478,6 +505,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     
     tStart = myClock.now();
     // TODO: profiling part
+#endif
     
     iota(this->ranks, this->ranks + this->population_count, 0); // fill with ascending values
     
@@ -490,17 +518,19 @@ void TravellingSalesmanProblem::rank_individuals() {
        return this->fitness[i] < this->fitness[j];
     });
     
+#ifdef microbenchmark_breed
     // TODO: profiling part
     tEnd = myClock.now();
     delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
     sortRuntimes.push_back(delta);
     // TODO: profiling part
+#endif
     
     //this->logger->LOG_WC(RANK_INDIVIDUALS_END);
 }
 
 
-void print256_bitset(__m256i var) {
+/*void print256_bitset(__m256i var) {
     
     uint32_t *val = (uint32_t*) &var;
     
@@ -508,7 +538,7 @@ void print256_bitset(__m256i var) {
         << bitset<32>(val[2]) << " " << bitset<32>(val[3]) << " "
         << bitset<32>(val[4]) << " " << bitset<32>(val[5]) << " "
         << bitset<32>(val[6]) << " " << bitset<32>(val[7]) << endl;
-}
+}*/
 
 
 Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
@@ -516,7 +546,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     // size of this part of the working set is:
     // sizeof(Real) * problem_size * problem_size
     
-    if(sizeof(Int) == 4) { // 32-bit version
+    /*if(sizeof(Int) == 4) { // 32-bit version
         // TODO: begin SIMD version
         // compute how many mask elements are covered by a __m256i
         const int INC_GENE = (256 / 8) / sizeof(Int); // bytes
@@ -620,12 +650,12 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
         
         
         // TODO: end SIMD version
-    }
+    }*/
     
     
     
     // TODO: start sequential version
-    /*Real route_distance = 0.0;
+    Real route_distance = 0.0;
     
     for (int j = 0; j < this->problem_size - 1; ++j) {
         VAL_POP(individual, j);
@@ -642,7 +672,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     
     //assertm(sumDistances == route_distance, "computed distance is not correct");
     
-    return route_distance;*/
+    return route_distance;
     // TODO: end sequential version
 }
 
@@ -660,16 +690,16 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
     if (useSIMD) {
     } else {
         
-        bool useSet = false;
+        bool useSet = true;
         
         if(useSet == false) {
 
-/*#ifdef microbenchmark_breed
+#ifdef microbenchmark_breed
             hrTime tStart, tEnd;
             int delta;
             
             tStart = myClock.now();
-#endif*/
+#endif
         
             //selecting gene sequences to be carried over to child
             int geneA = this->rand_range(0, this->problem_size - 1);
@@ -677,28 +707,28 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
             int startGene = min(geneA, geneB);
             int endGene = max(geneA, geneB);
         
-/*#ifdef microbenchmark_breed
+#ifdef microbenchmark_breed
             tEnd = myClock.now();
             delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
             rndRuntimes.push_back(delta);
             
             tStart = myClock.now();
-#endif*/
+#endif
         
             /*
              Experiment with mask.
              */
             
             // TODO: start sequential version
-            /*int mask[problem_size]; // size of a single individual
+            //int mask[problem_size]; // size of a single individual
             for(int idx = 0; idx < problem_size; idx++) {
                 mask[idx] = 1;
-            }*/
+            }
             // cities are indexed 0, ..., (problem_size-1)
             // TODO: end sequential version
             
             // TODO: start SIMD version
-            // compute how many mask elements are covered by a __m256i
+            /*// compute how many mask elements are covered by a __m256i
             const int INC_MASK = (256 / 8) / sizeof(Int); // bytes
             
             const __m256i ALL_BITS_SET_SIMD = _mm256_set1_epi32(0xFFFFFFFF);
@@ -714,22 +744,22 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
             
             for(; maskIdx < problem_size; maskIdx++) {
                 mask[maskIdx] = ALL_BITS_SET;
-            }
+            }*/
             // TODO: end SIMD version
             
             // TODO: start sequential version
-            /*for (int i = startGene; i <= endGene; ++i) {
+            for (int i = startGene; i <= endGene; ++i) {
                 // when running this version it is super important to use the
                 // local mask array
                 child[i] = POP(parent1, i);
                 //assertm(0 <= POP(parent1, i) && POP(parent1, i) <= problem_size-1, "segfault mask, loop chunk");
                 //assertm(mask[POP(parent1, i)] == 0xFFFFFFFF, "gene part is already masked, loop chunk");
                 mask[POP(parent1, i)] = 0x00000000;
-            }*/
+            }
             // TODO: end sequential version
             
             // TODO: start SIMD version
-            if(sizeof(Int) == 4) {
+            /*if(sizeof(Int) == 4) {
                 
                 const int ALL_BITS_ZERO = 0x00000000;
                 
@@ -827,7 +857,7 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
                     child[geneIdx] = geneSeg;
                     mask[geneSeg] = ALL_BITS_ZERO;
                 }
-            }
+            }*/
             // TODO: end SIMD version
             
             /*int sum = 0;
@@ -836,13 +866,13 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
             }
             assertm(sum == problem_size - ((endGene-startGene)+1), "num elements masked differs from num elements in chunk");*/
         
-/*#ifdef microbenchmark_breed
+#ifdef microbenchmark_breed
             tEnd = myClock.now();
             delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
             chunkRuntimes.push_back(delta);
 
             tStart = myClock.now();
-#endif*/
+#endif
         
             // writing all the time to child works better
             int parent2idx = 0;
@@ -988,11 +1018,11 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
             }*/
         
         
-/*#ifdef microbenchmark_breed
+#ifdef microbenchmark_breed
             tEnd = myClock.now();
             delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
             splitRuntimes.push_back(delta);
-#endif*/
+#endif
         
         } else { // useSet == true;
             
@@ -1073,7 +1103,7 @@ void TravellingSalesmanProblem::breed_population() {
 #endif
     
     
-    if(sizeof(Int) == 4) { // 32-bit version
+    /*if(sizeof(Int) == 4) { // 32-bit version
         // TODO: start SIMD version
         __m256i geneSegSIMD;
         int popIdx = 0;
@@ -1105,11 +1135,11 @@ void TravellingSalesmanProblem::breed_population() {
             }
         }
         // TODO: end SIMD version
-    }
+    }*/
 
     // TODO: start scalar version
     // Keep the best individuals
-    /*for (int i = 0; i < this->elite_size; ++i) {
+    for (int i = 0; i < this->elite_size; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             //temp_population[i][j] = POP(this->ranks[i], j);
             // start SIMD version
@@ -1118,7 +1148,7 @@ void TravellingSalesmanProblem::breed_population() {
             // end SIMD version
             //population[i][j] = POP(this->ranks[i], j);
         }
-    }*/
+    }
     // TODO: end scalar version
 
 
@@ -1132,7 +1162,7 @@ void TravellingSalesmanProblem::breed_population() {
     
     
     // TODO: start SIMD version
-    __m256 fitnessWeightsSIMD;
+    /*__m256 fitnessWeightsSIMD;
     
     const __m256 ONES_SIMD = _mm256_set1_ps(Real(1.0));
     Real fitnessConstant = Real(1) / fitness_sum;
@@ -1156,12 +1186,12 @@ void TravellingSalesmanProblem::breed_population() {
         fitnessWeights[indivIdx] = pow(fitnessWeights[indivIdx], 4);
         fitnessWeights[indivIdx] = 1.0 / fitnessWeights[indivIdx];
     }
-    auto dist = std::discrete_distribution<>(fitnessWeights, fitnessWeights + population_count);
+    auto dist = std::discrete_distribution<>(fitnessWeights, fitnessWeights + population_count);*/
     // TODO: end SIMD version
     
     
     // TODO: start scalar version
-    /*vector<double> correct_fitness(this->population_count);
+    vector<double> correct_fitness(this->population_count);
     //double fc = 1.0 / this->fitness_sum;
     for (int i = 0; i < this->population_count; ++i) {
         correct_fitness[i] = 1 / pow(this->fitness[i] / this->fitness_sum, 4);
@@ -1170,7 +1200,7 @@ void TravellingSalesmanProblem::breed_population() {
         //assert(abs(tmp - fitnessWeights[i]) / tmp < 1e-5);
     }
     
-    auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());*/
+    auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());
     // TODO: end scalar version
 
     
@@ -1214,7 +1244,7 @@ void TravellingSalesmanProblem::breed_population() {
     tStart = myClock.now();
 #endif
     
-    if(sizeof(Int) == 4) { // 32-bit version
+    /*if(sizeof(Int) == 4) { // 32-bit version
         // TODO: start SIMD version
         __m256i geneSegSIMD;
         int popIdx = 0;
@@ -1244,17 +1274,17 @@ void TravellingSalesmanProblem::breed_population() {
             }
         }
         // TODO: end SIMD version
-    }
+    }*/
     
     
     // TODO: start scalar version
-    /*for (int i = 0; i < this->population_count; ++i) {
+    for (int i = 0; i < this->population_count; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             VAL_POP(i, j);
             //assert(POP(i, j) == temp_population[i*problem_size + j]);
             POP(i, j) = temp_population[i*problem_size + j];
         }
-    }*/
+    }
     // TODO: end scalar version
     
     //this->logger->LOG_WC(BREED_POPULATION_END);
