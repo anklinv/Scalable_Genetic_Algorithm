@@ -11,5 +11,6 @@ SET(CMAKE_CXX_FLAGS  "-mavx2 -mbmi2 -O3 -funroll-loops")
 
 add_definitions(-D Int=int -D Real=float -D microbenchmark_breed)
 #[[ currently only Real={float} and Int={uint16_t, uint32_t, int} are supported ]]
+#[[ -D microbenchmark_breed  for microbenchmarks ]]
 
 add_executable(Distributed_Genetic_Algorithm main.cpp logging/logging.cpp sequential/travelling_salesman_problem.cpp island/island.cpp)

@@ -51,6 +51,8 @@ vi fitnessCorrect;
 vi breedRest;
 vi writeBack;
 
+vi sampleFromCorrected;
+
 /*
  For debugging.
  */
@@ -188,6 +190,7 @@ TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     double accFitnessCorrect = (double)accumulate(fitnessCorrect.begin(), fitnessCorrect.end(), 0) / (double)1e9;
     double accBreedRest = (double)accumulate(breedRest.begin(), breedRest.end(), 0) / (double)1e9;
     double accWriteBack = (double)accumulate(writeBack.begin(), writeBack.end(), 0) / (double)1e9;
+    double accSampleFromCorrected = (double)accumulate(sampleFromCorrected.begin(), sampleFromCorrected.end(), 0) / (double)1e9;
     
     
     cout << "--------------------------" << endl;
@@ -195,6 +198,7 @@ TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     cout << "accumulated runtime fitness correct: " << accFitnessCorrect << "s" << endl;
     cout << "accumulated runtime breed rest: " << accBreedRest << "s" << endl;
     cout << "accumulated runtime write back: " << accWriteBack << "s" << endl;
+    cout << "accumulated runtime sample from corrected: " << accSampleFromCorrected << "s" << endl;
     
     
     cout << "--------------------------" << endl;
@@ -512,86 +516,112 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     // size of this part of the working set is:
     // sizeof(Real) * problem_size * problem_size
     
-    
-    // TODO: begin SIMD version
-    // compute how many mask elements are covered by a __m256i
-    const int INC_GENE = (256 / 8) / sizeof(Int); // bytes
+    if(sizeof(Int) == 4) { // 32-bit version
+        // TODO: begin SIMD version
+        // compute how many mask elements are covered by a __m256i
+        const int INC_GENE = (256 / 8) / sizeof(Int); // bytes
+            
+        Real sumDistances = 0;
+        __m256 sumDistancesSIMD = _mm256_set1_ps(0);
         
-    Real sumDistances = 0;
-    __m256 sumDistancesSIMD = _mm256_set1_ps(0);
-    
-    // indices for distance matrix lookup
-    //__m256i geneSegSIMD;
-    //__m256i geneSegShiftedSIMD;
-    
-    const __m256i PROBLEM_SIZE_SIMD = _mm256_set1_epi32(problem_size);
-    
-    __m256i offsetsSIMD;
-    
-    // distances of the current gene segment
-    // (8 indices means 7 distances)
-    // ok ok ok ok ok ok ok garbage
-    __m256 distancesSIMD;
-    
-    __m256i geneSegIdx3MaskSIMD = _mm256_set_epi32(0, 0, 0, 0xFFFFFFFF, 0, 0, 0, 0);
-    
-    int geneIdx = 0;
-    
-    for(; geneIdx <= (problem_size - INC_GENE); geneIdx = geneIdx + (INC_GENE - 1)) {
+        // indices for distance matrix lookup
+        //__m256i geneSegSIMD;
+        //__m256i geneSegShiftedSIMD;
         
-        __m256i geneSegSIMD = _mm256_load_si256((__m256i *)&POP(individual, geneIdx));
+        const __m256i PROBLEM_SIZE_SIMD = _mm256_set1_epi32(problem_size);
         
-        // shift 128-bit lanes to the left by 32 bit
-        // 7 6 5 4 3 2 1 0 => 6 5 4 x 2 1 0 x (x padded with zeros)
-        // use extract to recover 3
-        int geneSegIdx3 = _mm256_extract_epi32(geneSegSIMD, 3);
+        __m256i offsetsSIMD;
         
-        __m256i geneSegShiftedSIMD = _mm256_slli_si256(geneSegSIMD, 4);
+        // distances of the current gene segment
+        // (8 indices means 7 distances)
+        // ok ok ok ok ok ok ok garbage
+        __m256 distancesSIMD;
         
-        __m256i geneSegIdx3SIMD = _mm256_set1_epi32(geneSegIdx3);
-        geneSegIdx3SIMD = _mm256_and_si256(geneSegIdx3SIMD, geneSegIdx3MaskSIMD);
+        __m256i geneSegIdx3MaskSIMD = _mm256_set_epi32(0, 0, 0, 0xFFFFFFFF, 0, 0, 0, 0);
         
-        geneSegShiftedSIMD = _mm256_or_si256(geneSegShiftedSIMD, geneSegIdx3SIMD);
+        int geneIdx = 0;
         
-        // now we have like like
-        // 6 5 4 3 2 1 0 x geneSegShiftedSIMD (x padded with zeros)
-        // 7 6 5 4 3 2 1 0 geneSegSIMD
+        for(; geneIdx <= (problem_size - INC_GENE); geneIdx = geneIdx + (INC_GENE - 1)) {
+            
+            __m256i geneSegSIMD = _mm256_load_si256((__m256i *)&POP(individual, geneIdx));
+            
+            // shift 128-bit lanes to the left by 32 bit
+            // 7 6 5 4 3 2 1 0 => 6 5 4 x 2 1 0 x (x padded with zeros)
+            // use extract to recover 3
+            int geneSegIdx3 = _mm256_extract_epi32(geneSegSIMD, 3);
+            
+            __m256i geneSegShiftedSIMD = _mm256_slli_si256(geneSegSIMD, 4);
+            
+            __m256i geneSegIdx3SIMD = _mm256_set1_epi32(geneSegIdx3);
+            geneSegIdx3SIMD = _mm256_and_si256(geneSegIdx3SIMD, geneSegIdx3MaskSIMD);
+            
+            geneSegShiftedSIMD = _mm256_or_si256(geneSegShiftedSIMD, geneSegIdx3SIMD);
+            
+            // now we have like like
+            // 6 5 4 3 2 1 0 x geneSegShiftedSIMD (x padded with zeros)
+            // 7 6 5 4 3 2 1 0 geneSegSIMD
+            
+            offsetsSIMD = _mm256_mullo_epi32(geneSegShiftedSIMD, PROBLEM_SIZE_SIMD); // super slow
+            offsetsSIMD = _mm256_add_epi32(offsetsSIMD, geneSegSIMD);
+            
+            // make sure cities is aligned to 32 in memory
+            distancesSIMD = _mm256_i32gather_epi32(cities, offsetsSIMD, 4);
+            
+            // 6-7 5-6 4-5 3-4 2-3 1-2 0-1 x
+            
+            // simultaneous add to SIMD sum
+            sumDistancesSIMD = _mm256_add_ps(sumDistancesSIMD, distancesSIMD);
+        }
         
-        offsetsSIMD = _mm256_mullo_epi32(geneSegShiftedSIMD, PROBLEM_SIZE_SIMD); // super slow
-        offsetsSIMD = _mm256_add_epi32(offsetsSIMD, geneSegSIMD);
+        // ok ok ok ok ok ok ok garbage
+        // (use mask to eliminate garbage)
+        __m256i garbageMaskSIMD = _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+                                                 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0);
+        sumDistancesSIMD = _mm256_and_si256(sumDistancesSIMD, garbageMaskSIMD);
+            
+        // compute horizontal sum
+        sumDistancesSIMD = _mm256_hadd_ps(sumDistancesSIMD, sumDistancesSIMD); // sums of 2 candidates
+        sumDistancesSIMD = _mm256_hadd_ps(sumDistancesSIMD, sumDistancesSIMD); // sums of 4 candidates
         
-        // make sure cities is aligned to 32 in memory
-        distancesSIMD = _mm256_i32gather_epi32(cities, offsetsSIMD, 4);
+        Real sumLowH = _mm256_cvtss_f32(sumDistancesSIMD);
+        sumDistances += sumLowH;
         
-        // 6-7 5-6 4-5 3-4 2-3 1-2 0-1 x
+        Real sumHighH = _mm256_cvtss_f32(_mm256_permute2f128_ps(sumDistancesSIMD, sumDistancesSIMD, 1));
+        sumDistances += sumHighH;
         
-        // simultaneous add to SIMD sum
-        sumDistancesSIMD = _mm256_add_ps(sumDistancesSIMD, distancesSIMD);
+        // scalar loop for residual
+        for(; geneIdx < (problem_size - 1); geneIdx++) {
+            sumDistances += DIST(POP(individual, geneIdx), POP(individual, geneIdx + 1));
+        }
+        sumDistances += DIST(POP(individual, problem_size-1), POP(individual, 0)); // round trip
+        return sumDistances;
+        // TODO: end SIMD version
+    } else if(sizeof(Int) == 2) { // 16-bit version
+        // TODO: start SIMD version
+        // compute how many mask elements are covered by a __m256i
+        const int INC_GENE = 16;
+        
+        Real sumDistances = 0;
+        __m256 sumDistancesSIMD1 = _mm256_set1_ps(0);
+        __m256 sumDistancesSIMD2 = _mm256_set1_ps(0);
+        
+        const __m256i PROBLEM_SIZE_SIMD = _mm256_set1_epi32(problem_size);
+        
+        __m256i offsetsSIMD1;
+        __m256i offsetsSIMD2;
+        
+        // distances of the current gene segment
+        // (8 indices means 7 distances)
+        // ok ok ok ok ok ok ok garbage
+        __m256 distancesSIMD1;
+        __m256 distancesSIMD2;
+        
+        int geneIdx = 0;
+        
+        
+        // TODO: end SIMD version
     }
     
-    // ok ok ok ok ok ok ok garbage
-    // (use mask to eliminate garbage)
-    __m256i garbageMaskSIMD = _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
-                                             0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0);
-    sumDistancesSIMD = _mm256_and_si256(sumDistancesSIMD, garbageMaskSIMD);
-        
-    // compute horizontal sum
-    sumDistancesSIMD = _mm256_hadd_ps(sumDistancesSIMD, sumDistancesSIMD); // sums of 2 candidates
-    sumDistancesSIMD = _mm256_hadd_ps(sumDistancesSIMD, sumDistancesSIMD); // sums of 4 candidates
-    
-    Real sumLowH = _mm256_cvtss_f32(sumDistancesSIMD);
-    sumDistances += sumLowH;
-    
-    Real sumHighH = _mm256_cvtss_f32(_mm256_permute2f128_ps(sumDistancesSIMD, sumDistancesSIMD, 1));
-    sumDistances += sumHighH;
-    
-    // scalar loop for residual
-    for(; geneIdx < (problem_size - 1); geneIdx++) {
-        sumDistances += DIST(POP(individual, geneIdx), POP(individual, geneIdx + 1));
-    }
-    sumDistances += DIST(POP(individual, problem_size-1), POP(individual, 0)); // round trip
-    return sumDistances;
-    // TODO: end SIMD version
     
     
     // TODO: start sequential version
@@ -634,12 +664,12 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
         
         if(useSet == false) {
 
-#ifdef microbenchmark_breed
+/*#ifdef microbenchmark_breed
             hrTime tStart, tEnd;
             int delta;
             
             tStart = myClock.now();
-#endif
+#endif*/
         
             //selecting gene sequences to be carried over to child
             int geneA = this->rand_range(0, this->problem_size - 1);
@@ -647,13 +677,13 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
             int startGene = min(geneA, geneB);
             int endGene = max(geneA, geneB);
         
-#ifdef microbenchmark_breed
+/*#ifdef microbenchmark_breed
             tEnd = myClock.now();
             delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
             rndRuntimes.push_back(delta);
             
             tStart = myClock.now();
-#endif
+#endif*/
         
             /*
              Experiment with mask.
@@ -806,13 +836,13 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
             }
             assertm(sum == problem_size - ((endGene-startGene)+1), "num elements masked differs from num elements in chunk");*/
         
-#ifdef microbenchmark_breed
+/*#ifdef microbenchmark_breed
             tEnd = myClock.now();
             delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
             chunkRuntimes.push_back(delta);
 
             tStart = myClock.now();
-#endif
+#endif*/
         
             // writing all the time to child works better
             int parent2idx = 0;
@@ -958,11 +988,11 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
             }*/
         
         
-#ifdef microbenchmark_breed
+/*#ifdef microbenchmark_breed
             tEnd = myClock.now();
             delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
             splitRuntimes.push_back(delta);
-#endif
+#endif*/
         
         } else { // useSet == true;
             
@@ -1030,40 +1060,54 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
 
 void TravellingSalesmanProblem::breed_population() {
     //this->logger->LOG_WC(BREED_POPULATION_BEGIN);
-    
-    // TODO: do this in-place
-    // TODO: make this global (don't allocate, free, allocate, free, ... as this is "huge")
-    // in order to speed things up
-    //Int temp_population[this->population_count][this->problem_size];
    
 #ifdef microbenchmark_breed
     hrTime tStart, tEnd;
     int delta;
     
     tStart = myClock.now();
+    
+    
+    hrTime tStartIntermediate, tEndIntermediate;
+    int deltaIntermediate;
 #endif
     
-    // TODO: start SIMD version
-    __m256i geneSegSIMD;
     
-    int popIdx = 0;
-    for(; popIdx < elite_size; popIdx++) {
-        
-        int currIndividual = ranks[popIdx];
-        
-        int geneIdx = 0;
-        for(; geneIdx <= problem_size - 8; geneIdx = geneIdx + 8) {
-            geneSegSIMD = _mm256_load_si256((__m256i *)&POP(currIndividual, geneIdx));
-            _mm256_store_si256((__m256i *)&temp_population[popIdx*problem_size + geneIdx], geneSegSIMD);
+    if(sizeof(Int) == 4) { // 32-bit version
+        // TODO: start SIMD version
+        __m256i geneSegSIMD;
+        int popIdx = 0;
+        for(; popIdx < elite_size; popIdx++) {
+            int currIndividual = ranks[popIdx];
+            int geneIdx = 0;
+            for(; geneIdx <= problem_size - 8; geneIdx = geneIdx + 8) {
+                geneSegSIMD = _mm256_load_si256((__m256i *)&POP(currIndividual, geneIdx));
+                _mm256_store_si256((__m256i *)&temp_population[popIdx*problem_size + geneIdx], geneSegSIMD);
+            }
+            for(; geneIdx < problem_size; geneIdx++) {
+                temp_population[popIdx*problem_size + geneIdx] = POP(currIndividual, geneIdx);
+            }
         }
-        for(; geneIdx < problem_size; geneIdx++) {
-            temp_population[popIdx*problem_size + geneIdx] = POP(currIndividual, geneIdx);
+        // TODO: end SIMD version
+    } else if(sizeof(Int) == 2) {// 16-bit version
+        // TODO: start SIMD version
+        __m256i geneSegSIMD;
+        int popIdx = 0;
+        for(; popIdx < elite_size; popIdx++) {
+            int currIndividual = ranks[popIdx];
+            int geneIdx = 0;
+            for(; geneIdx <= problem_size - 16; geneIdx = geneIdx + 16) {
+                geneSegSIMD = _mm256_load_si256((__m256i *)&POP(currIndividual, geneIdx));
+                _mm256_store_si256((__m256i *)&temp_population[popIdx*problem_size + geneIdx], geneSegSIMD);
+            }
+            for(; geneIdx < problem_size; geneIdx++) {
+                temp_population[popIdx*problem_size + geneIdx] = POP(currIndividual, geneIdx);
+            }
         }
+        // TODO: end SIMD version
     }
-    // TODO: end SIMD version
-    
 
-    // TODO: start sequential version
+    // TODO: start scalar version
     // Keep the best individuals
     /*for (int i = 0; i < this->elite_size; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
@@ -1075,7 +1119,7 @@ void TravellingSalesmanProblem::breed_population() {
             //population[i][j] = POP(this->ranks[i], j);
         }
     }*/
-    // TODO: end sequential version
+    // TODO: end scalar version
 
 
 #ifdef microbenchmark_breed
@@ -1116,7 +1160,7 @@ void TravellingSalesmanProblem::breed_population() {
     // TODO: end SIMD version
     
     
-    // TODO: start sequential version
+    // TODO: start scalar version
     /*vector<double> correct_fitness(this->population_count);
     //double fc = 1.0 / this->fitness_sum;
     for (int i = 0; i < this->population_count; ++i) {
@@ -1127,7 +1171,7 @@ void TravellingSalesmanProblem::breed_population() {
     }
     
     auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());*/
-    // TODO: end sequential version
+    // TODO: end scalar version
 
     
 #ifdef microbenchmark_breed
@@ -1141,8 +1185,19 @@ void TravellingSalesmanProblem::breed_population() {
     
     // Breed any random individuals
     for (int i = this->elite_size; i < this->population_count; ++i) {
+        
+#ifdef microbenchmark_breed
+        tStartIntermediate = myClock.now();
+#endif
         int rand1 = dist(gen);
         int rand2 = dist(gen);
+        
+#ifdef microbenchmark_breed
+        tEndIntermediate = myClock.now();
+        deltaIntermediate = std::chrono::duration_cast<hrNanos>(tEndIntermediate - tStartIntermediate).count();
+        sampleFromCorrected.push_back(deltaIntermediate);
+#endif
+        
         //this->breed(rand1, rand2, temp_population[i]);
         // start SIMD version
         this->breed(rand1, rand2, &temp_population[i*problem_size]);
@@ -1159,19 +1214,37 @@ void TravellingSalesmanProblem::breed_population() {
     tStart = myClock.now();
 #endif
     
-    // TODO: start SIMD version
-    popIdx = 0;
-    for(; popIdx < population_count; popIdx++) {
-        int geneIdx = 0;
-        for(; geneIdx <= problem_size - 8; geneIdx = geneIdx + 8) {
-            geneSegSIMD = _mm256_load_si256((__m256i *)&temp_population[popIdx * problem_size + geneIdx]);
-            _mm256_store_si256((__m256i *)&POP(popIdx, geneIdx), geneSegSIMD);
+    if(sizeof(Int) == 4) { // 32-bit version
+        // TODO: start SIMD version
+        __m256i geneSegSIMD;
+        int popIdx = 0;
+        for(; popIdx < population_count; popIdx++) {
+            int geneIdx = 0;
+            for(; geneIdx <= problem_size - 8; geneIdx = geneIdx + 8) {
+                geneSegSIMD = _mm256_load_si256((__m256i *)&temp_population[popIdx * problem_size + geneIdx]);
+                _mm256_store_si256((__m256i *)&POP(popIdx, geneIdx), geneSegSIMD);
+            }
+            for(; geneIdx < problem_size; geneIdx++) {
+                POP(popIdx, geneIdx) = temp_population[popIdx * problem_size + geneIdx];
+            }
         }
-        for(; geneIdx < problem_size; geneIdx++) {
-            POP(popIdx, geneIdx) = temp_population[popIdx * problem_size + geneIdx];
+        // TODO: end SIMD version
+    } else if(sizeof(Int) == 2) { // 16-bit version
+        // TODO: start SIMD version
+        __m256i geneSegSIMD;
+        int popIdx = 0;
+        for(; popIdx < population_count; popIdx++) {
+            int geneIdx = 0;
+            for(; geneIdx <= problem_size - 16; geneIdx = geneIdx + 16) {
+                geneSegSIMD = _mm256_load_si256((__m256i *)&temp_population[popIdx * problem_size + geneIdx]);
+                _mm256_store_si256((__m256i *)&POP(popIdx, geneIdx), geneSegSIMD);
+            }
+            for(; geneIdx < problem_size; geneIdx++) {
+                POP(popIdx, geneIdx) = temp_population[popIdx * problem_size + geneIdx];
+            }
         }
+        // TODO: end SIMD version
     }
-    // TODO: end SIMD version
     
     
     // TODO: start scalar version
@@ -1196,38 +1269,17 @@ void TravellingSalesmanProblem::breed_population() {
 }
 
 void TravellingSalesmanProblem::mutate(const int individual) {
-    
-    bool useSIMD = false;
-    
-    if(useSIMD) {
-    } else {
-        
-        if (rand() % this->mutation_rate == 0) {
-            int swap = rand_range(0, this->problem_size - 1);
-            int swap_with = rand_range(0, this->problem_size - 1);
+    if (rand() % this->mutation_rate == 0) {
+        int swap = rand_range(0, this->problem_size - 1);
+        int swap_with = rand_range(0, this->problem_size - 1);
 
-            VAL_POP(individual, swap);
-            VAL_POP(individual, swap_with);
-            Int city1 = POP(individual, swap);
-            Int city2 = POP(individual, swap_with);
-            POP(individual, swap) = city2;
-            POP(individual, swap_with) = city1;
-        }
-    
-        /*if (rand() % this->mutation_rate == 0) {
-            int swap = rand_range(0, this->problem_size - 1);
-            int swap_with = rand_range(0, this->problem_size - 1);
-
-            VAL_POP(individual, swap);
-            VAL_POP(individual, swap_with);
-            int city1 = POP(individual, swap);
-            int city2 = POP(individual, swap_with);
-            POP(individual, swap) = city2;
-            POP(individual, swap_with) = city1;
-        }*/
-    
+        VAL_POP(individual, swap);
+        VAL_POP(individual, swap_with);
+        Int city1 = POP(individual, swap);
+        Int city2 = POP(individual, swap_with);
+        POP(individual, swap) = city2;
+        POP(individual, swap_with) = city1;
     }
-    
 }
 
 void TravellingSalesmanProblem::mutate_population() {
