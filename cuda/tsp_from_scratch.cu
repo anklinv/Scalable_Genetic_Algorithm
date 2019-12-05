@@ -28,7 +28,7 @@
 #define POP(i,j) population[i * PROB_SIZE + j]
 #define NPOP(i,j) new_population[i * PROB_SIZE + j]
 #define DIST(i,j) problem[i * PROB_SIZE + j]
-#define ISLAND_POP_SIZE POP_SIZE / ISLANDS
+#define ISLAND_POP_SIZE (POP_SIZE / ISLANDS)
 
 typedef float problem_t[PROB_SIZE][PROB_SIZE];
 
@@ -67,37 +67,35 @@ __global__ void crossover_and_migrate(
     population_fitness_t fitness_prefix_sum,
     population_t new_population
 ) {
+    int island = blockIdx.x;
 	int index = threadIdx.x + blockIdx.x * blockDim.x;
     individual_t &new_individual = new_population[index];
+
     //get indices of the two parents by a random variable that has the normalized fitness values as distributions (use the thrust lower bound on the prefix sorted fitness values)
     curandState s;
     curand_init(index, 0, 0, &s);
-    // TODO search within a specific single island
+
     int parent_1_idx = thrust::lower_bound(
         thrust::device,
-        fitness_prefix_sum,
-        // fitness_prefix_sum + ISLAND_POP_SIZE,
-        fitness_prefix_sum + POP_SIZE,
+        fitness_prefix_sum + island * ISLAND_POP_SIZE,
+        fitness_prefix_sum + (island + 1) * ISLAND_POP_SIZE,
         curand_uniform(&s) * fitness_prefix_sum[POP_SIZE-1]
     ) - fitness_prefix_sum;
-    int parent_2_idx = parent_1_idx; // TODO when parent1 is correct, copy code to parent2
-    // int parent2_id = thrust::lower_bound(
-    //     thrust::device, fitness_prefix_sum, fitness_prefix_sum + ISLAND_POP_SIZE, curand_uniform(curand_state)
-    // ) - fitness_prefix_sum - 1;
     individual_t &parent_1 = population[parent_1_idx];
+
+    int parent_2_idx = thrust::lower_bound(
+        thrust::device,
+        fitness_prefix_sum + island * ISLAND_POP_SIZE,
+        fitness_prefix_sum + (island + 1) * ISLAND_POP_SIZE,
+        curand_uniform(&s) * fitness_prefix_sum[POP_SIZE-1]
+    ) - fitness_prefix_sum;
     individual_t &parent_2 = population[parent_2_idx];
 	
     //fill the first half of the child with the first parent
     for (int j = 0; j < PROB_SIZE / 2; j++) {
         new_individual[j] = parent_1[j];
     }
-		
-    //fill the rest of the child with -1 entries such that it is no longer garbage
-    // TODO is that even necessary?
-    for (int j = PROB_SIZE / 2; j < PROB_SIZE; j++) {
-        new_individual[j] = -1;
-    }
-		
+
     //for the second half of the child we only choose entries from parent 2 that aren't already in the child
     // TODO implement with masking
     for (int j = PROB_SIZE / 2; j < PROB_SIZE; j++) {
@@ -108,30 +106,35 @@ __global__ void crossover_and_migrate(
                 new_individual + j,
                 parent_2[k]
             ) - new_individual;
-            // if this element does not feature in new_individual, add it
+            // if this element does not already feature in new_individual, add it
             if (existing == j) {
-                new_individual[j] = existing;
+                new_individual[j] = parent_2[k];
                 break;
             }
         }
     }
+
     // //perform the migration
+    // int target_island = (island + 1) % ISLANDS;
+    // __shared__ int r_1, r_2;
     // if (threadIdx.x == 0) {
-    //     island_1 = index % ISLANDS;
-    //     island_2 = (island_1 + 1) % ISLANDS;
     //     r_1 = rand() % ISLAND_POP_SIZE;
     //     r_2 = rand() % ISLAND_POP_SIZE;
     // }
-	// __syncthreads();
+	__syncthreads();
     // //Each thread takes a single gene from one of five
     // int temp[PROB_SIZE * MIGRATION];
     // if (threadIdx.x != 0 && threadIdx.x < PROB_SIZE * MIGRATION) {
     //     int migrant_index = threadIdx.x - 1;
-    //     // TODO where does island_1, r_1 etc come from? are they shared?
     //     temp[migrant_index] = NPOP(island_1 * ISLAND_POP_SIZE + r_1, remainder(migrant_index, PROB_SIZE));
     //     NPOP(island_1 * POP_SIZE / ISLAND + r_1, remainder(migrant_index, PROB_SIZE)) = NPOP(island_2 * ISLAND_POP_SIZE + r_2, remainder(migrant_index, PROB_SIZE))
     //     NPOP(island_2 * POP_SIZE / ISLAND + r_2, remainder(migrant_index, PROB_SIZE)) = temp[migrant_index];
     // }
+
+    // overwrite existing population with the newly created one
+    for (int j = 0; j < PROB_SIZE; j++) {
+        population[index][j] = new_individual[j];
+    }
 }
 
 __global__ void mutate(population_t population){
@@ -160,7 +163,7 @@ int main (void) {
     individual_t *population, *new_population; // population_t
     float (*problem)[PROB_SIZE]; // problem_t
 	float *fitness, *fitness_prefix_sum; // population_fitness_t
-    // int *sorted_fitness;
+    int *sorted_fitness_idxs;
 
 	//random device
 	random_device rd;
@@ -172,7 +175,7 @@ int main (void) {
 	cudaMallocManaged(&new_population, sizeof(population_t));
 	cudaMallocManaged(&fitness, sizeof(population_fitness_t));
 	cudaMallocManaged(&fitness_prefix_sum, sizeof(population_fitness_t));
-	// cudaMallocManaged(sorted_fitness, POP_SIZE *sizeof(int));
+	cudaMallocManaged(&sorted_fitness_idxs, POP_SIZE * sizeof(int));
 
 	//initialize sequence of matrix indices to be used for initializing the population
 	vector<int> tmp_indices(PROB_SIZE);
@@ -203,25 +206,36 @@ int main (void) {
             		population[i][j] = tmp_indices[j];
         	}
 		fitness[i] = 0.0f;
-		// sorted_fitness[i] = i;
     }
 
 	//run GA
-	for (int i = 0; i < EPOCHS; i++){
+	for (int epoch = 0; epoch < EPOCHS; epoch++){
 		//begin epoch by ranking fitness of population
 		rank_individuals<<<ISLANDS, ISLAND_POP_SIZE>>>(population, problem, fitness);
-		
-		//perform a sort of the fitness values to implement the elitism strategy
+        
+        // TODO this actually changes order of fitness, but not population
+		// //perform a sort of the fitness values to implement the elitism strategy
+        // for (int i = 0; i < POP_SIZE; ++i) {
+        //     sorted_fitness_idxs[i] = i;
+        // }
         // for (int j = 0; j < ISLANDS; j++) {
-        //     thrust::sort_by_key(sorted_fitness + j * ISLAND_POP_SIZE, sorted_fitness + (j + 1) * ISLAND_POP_SIZE, fitness + j * ISLAND_POP_SIZE);
+        //     thrust::sort_by_key(
+        //         thrust::device,
+        //         fitness + j * ISLAND_POP_SIZE,
+        //         fitness + (j + 1) * ISLAND_POP_SIZE,
+        //         sorted_fitness_idxs + j * ISLAND_POP_SIZE
+        //     );
         // }
 
         //perform a prefix sum of the fitness in order to easily perform roulette wheel selection of a suitable parent
-        // TODO calculate inclusive scan within islands
-        // for (int j = 0; j < ISLANDS; j++) {
-        //     thrust::inclusive_scan(fitness + j * ISLAND_POP_SIZE, fitness + (j + 1) * ISLAND_POP_SIZE, fitness_prefix_sum + j * ISLAND_POP_SIZE);
-        // }
-        thrust::inclusive_scan(fitness, fitness + POP_SIZE, fitness_prefix_sum);
+        for (int j = 0; j < ISLANDS; j++) {
+            thrust::inclusive_scan(
+                thrust::device,
+                fitness + j * ISLAND_POP_SIZE,
+                fitness + (j + 1) * ISLAND_POP_SIZE,
+                fitness_prefix_sum + j * ISLAND_POP_SIZE
+            );
+        }
         
 		//perform crossover on the islands
 		crossover_and_migrate<<<ISLANDS, ISLAND_POP_SIZE>>>(population, fitness, fitness_prefix_sum, new_population);
@@ -230,7 +244,7 @@ int main (void) {
         mutate<<<ISLANDS, ISLAND_POP_SIZE>>>(population);
 
         // float best_fitness = 0.0f;
-        cout << fitness[0] << endl;
+        cout << "epoch " << epoch << ": " << fitness[0] << endl;
 	}
 
 	cudaFree(problem);
@@ -238,7 +252,7 @@ int main (void) {
 	cudaFree(new_population);
 	cudaFree(fitness);
 	cudaFree(fitness_prefix_sum);
-	// cudaFree(sorted_fitness);
+	cudaFree(sorted_fitness_idxs);
 	
 	return 0;
 }
