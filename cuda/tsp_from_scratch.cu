@@ -32,16 +32,20 @@ using namespace std;
 __global__ void rank_individuals(int *population, float *problem, float *fitness, float *sorted_fitness) {
 	//blockDim: number of threads in block
 	//gridDim: number of blocks in grid
-	int index = threadIdx.x + blockIdx.x * blockDim.x;
+    int index = threadIdx.x + blockIdx.x * blockDim.x;
+    float distance = 0;
     for (int j = 0; j < PROB_SIZE - 1; j++) {
-        fitness[index] += DIST(j,j+1);
+        // TODO fix DIST to use member's data
+        distance += DIST(j,j+1);
     }
-    fitness[index] += DIST(PROB_SIZE - 1, 0);
-    fitness[index] = 1/fitness[index];
+    distance += DIST(PROB_SIZE - 1, 0);
+    fitness[index] = 1 / distance;
 	__syncthreads();
 }
 
-__global__ void crossover_and_migrate(int *population, float *fitness, int *prefix_sort_fintess, int *new_population) {
+// arguments:
+//  prefix_sort_fitness - fitness value prefix sum
+__global__ void crossover_and_migrate(int *population, float *fitness, float *prefix_sort_fitness, int *new_population) {
 	int index = threadIdx.x + blockIdx.x * blockDim.x;
     int temp[PROB_SIZE * MIGRATION];
 	int parent1_id;
@@ -54,23 +58,31 @@ __global__ void crossover_and_migrate(int *population, float *fitness, int *pref
 
     //get indices of the two parents by a random variable that has the normalized fitness values as distributions (use the thrust lower bound on the prefix sorted fitness values)
     roulette = rand() % prefix_sort_fitness[POP_SIZE-1];
-    parent1_id = thrust::lower_bound(thrust::device, prefix_sort_fitness, prefix_sort_fitness + POP_SIZE, roulette) - prefix_sort - 1;
+    // TODO search within a single island
+    parent1_id = thrust::lower_bound(
+        thrust::device, prefix_sort_fitness, prefix_sort_fitness + ISLAND_MEMBERS, roulette
+    ) - prefix_sort_fitness - 1;
     roulette = rand() % prefix_sort_fitness[POP_SIZE-1];
-    parent2_id = thrust::lower_bound(thrust::device, prefix_sort_fitness, prefix_sort_fitness + POP_SIZE, roulette) - prefix_sort - 1;
+    parent2_id = thrust::lower_bound(
+        thrust::device, prefix_sort_fitness, prefix_sort_fitness + ISLAND_MEMBERS, roulette
+    ) - prefix_sort_fitness - 1;
 	
     //fill the first half of the child with the first parent
-    for (int j = 0; j < int(PROB_SIZE/2); j++){
+    for (int j = 0; j < int(PROB_SIZE/2); j++) {
         NPOP(index,j) = POP(parent1_id,j);
+    }
 		
     //fill the rest of the child with -1 entries such that it is no longer garbage
     for (int j = int(PROB_SIZE/2); j < PROB_SIZE; j++) {
         NPOP(index,j) = -1;
+    }
 		
     //for the second half of the child we only choose entries from parent 2 that aren't already in the child
+    // TODO implement with masking
     for (int j = int(PROB_SIZE/2); j < PROB_SIZE; j++) {
         for (int k = 0; k < PROB_SIZE; k++) {
             existing = thrust::find(thrust::device, *NPOP(index,0), *NPOP(index,j), POP(parent2_id,k)) - *NPOP(index,0);
-            if (existing != j){
+            if (existing != j) {
                 NPOP(index,j) = existing;
                 break;
             }
