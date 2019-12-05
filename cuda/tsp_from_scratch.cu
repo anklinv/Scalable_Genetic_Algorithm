@@ -10,8 +10,10 @@
 #include <cassert>
 #include <math.h>
 
+#include <curand_kernel.h>
 #include <thrust/sort.h>
 #include <thrust/scan.h>
+#include <thrust/binary_search.h>
 
 #define POP_SIZE 1000
 #define PROB_SIZE 48
@@ -29,7 +31,7 @@
 
 using namespace std;
 
-__global__ void rank_individuals(int *population, float *problem, float *fitness, float *sorted_fitness) {
+__global__ void rank_individuals(int *population, float *problem, float *fitness) {
 	//blockDim: number of threads in block
 	//gridDim: number of blocks in grid
     int index = threadIdx.x + blockIdx.x * blockDim.x;
@@ -47,25 +49,21 @@ __global__ void rank_individuals(int *population, float *problem, float *fitness
 //  prefix_sort_fitness - fitness value prefix sum
 __global__ void crossover_and_migrate(int *population, float *fitness, float *prefix_sort_fitness, int *new_population) {
 	int index = threadIdx.x + blockIdx.x * blockDim.x;
-    int temp[PROB_SIZE * MIGRATION];
-	int parent1_id;
-	int parent2_id;
-    int migrant_1, migrant_2, island_1, island_2;
-	float roulette;
-    int r_1, r_2;
-	int existing;
-    int migrant_index;
 
     //get indices of the two parents by a random variable that has the normalized fitness values as distributions (use the thrust lower bound on the prefix sorted fitness values)
-    roulette = rand() % prefix_sort_fitness[POP_SIZE-1];
-    // TODO search within a single island
-    parent1_id = thrust::lower_bound(
-        thrust::device, prefix_sort_fitness, prefix_sort_fitness + ISLAND_MEMBERS, roulette
+    curandState s;
+    curand_init(index, 0, 0, &s);
+    // TODO search within a specific single island
+    int parent1_id = thrust::lower_bound(
+        thrust::device,
+        prefix_sort_fitness,
+        prefix_sort_fitness + ISLAND_MEMBERS,
+        curand_uniform(&s) * prefix_sort_fitness[POP_SIZE-1]
     ) - prefix_sort_fitness - 1;
-    roulette = rand() % prefix_sort_fitness[POP_SIZE-1];
-    parent2_id = thrust::lower_bound(
-        thrust::device, prefix_sort_fitness, prefix_sort_fitness + ISLAND_MEMBERS, roulette
-    ) - prefix_sort_fitness - 1;
+    int parent2_id = parent1_id; // TODO when parent1 is correct, copy code to parent2
+    // int parent2_id = thrust::lower_bound(
+    //     thrust::device, prefix_sort_fitness, prefix_sort_fitness + ISLAND_MEMBERS, curand_uniform(curand_state)
+    // ) - prefix_sort_fitness - 1;
 	
     //fill the first half of the child with the first parent
     for (int j = 0; j < int(PROB_SIZE/2); j++) {
@@ -81,45 +79,45 @@ __global__ void crossover_and_migrate(int *population, float *fitness, float *pr
     // TODO implement with masking
     for (int j = int(PROB_SIZE/2); j < PROB_SIZE; j++) {
         for (int k = 0; k < PROB_SIZE; k++) {
-            existing = thrust::find(thrust::device, *NPOP(index,0), *NPOP(index,j), POP(parent2_id,k)) - *NPOP(index,0);
+            int existing = thrust::find(thrust::device, &NPOP(index,0), &NPOP(index,j), POP(parent2_id,k)) - &NPOP(index,0);
             if (existing != j) {
                 NPOP(index,j) = existing;
                 break;
             }
         }
     }
-    //perform the migration
-    if (threadIdx.x == 0) {
-        island_1 = index % ISLANDS;
-        island_2 = (island_1 + 1) % ISLANDS;
-        r_1 = rand() % ISLAND_MEMBERS;
-        r_2 = rand() % ISLAND_MEMBERS;
-    }
-	__syncthreads();
-    //Each thread takes a single gene from one of five
-    if (threadIdx.x != 0 && threadIdx.x < PROB_SIZE * MIGRATION) {
-        migrant_index = threadIdx.x - 1;
-        temp[migrant_index] = NPOP(island_1 * ISLAND_MEMBERS + r_1, remainder(migrant_index, PROB_SIZE));
-        NPOP(island_1 * POP_SIZE / ISLAND + r_1, remainder(migrant_index, PROB_SIZE)) = NPOP(island_2 * ISLAND_MEMBERS + r_2, remainder(migrant_index, PROB_SIZE))
-        NPOP(island_2 * POP_SIZE / ISLAND + r_2, remainder(migrant_index, PROB_SIZE)) = temp[migrant_index];
-    }
+    // //perform the migration
+    // if (threadIdx.x == 0) {
+    //     island_1 = index % ISLANDS;
+    //     island_2 = (island_1 + 1) % ISLANDS;
+    //     r_1 = rand() % ISLAND_MEMBERS;
+    //     r_2 = rand() % ISLAND_MEMBERS;
+    // }
+	// __syncthreads();
+    // //Each thread takes a single gene from one of five
+    // int temp[PROB_SIZE * MIGRATION];
+    // if (threadIdx.x != 0 && threadIdx.x < PROB_SIZE * MIGRATION) {
+    //     int migrant_index = threadIdx.x - 1;
+    //     // TODO where does island_1, r_1 etc come from? are they shared?
+    //     temp[migrant_index] = NPOP(island_1 * ISLAND_MEMBERS + r_1, remainder(migrant_index, PROB_SIZE));
+    //     NPOP(island_1 * POP_SIZE / ISLAND + r_1, remainder(migrant_index, PROB_SIZE)) = NPOP(island_2 * ISLAND_MEMBERS + r_2, remainder(migrant_index, PROB_SIZE))
+    //     NPOP(island_2 * POP_SIZE / ISLAND + r_2, remainder(migrant_index, PROB_SIZE)) = temp[migrant_index];
+    // }
 }
 
 __global__ void mutate(int * population){
     int index = threadIdx.x + blockIdx.x * blockDim.x;
-    int temp;
-    default_random_engine generator;
+
+    curandState s;
+    curand_init(index, 0, 0, &s);
+
     for (int j = 0; j < PROB_SIZE; j++){
-        bernoulli_distribution ber(MUTATION);
-        if (ber(generator)){
-            for (int k = 0; k < PROB_SIZE; k++) {
-                bernoulli_distribution ber(MUTATION);
-                if (ber(generator)){
-                    temp = POP(index,j);
-                    POP(index,j) = POP(index,k);
-                    POP(index,k) = temp;
-                    break;
-                }
+        for (int k = 0; k < PROB_SIZE; k++) {
+            if (curand_uniform(&s) < MUTATION) {
+                int temp = POP(index,j);
+                POP(index,j) = POP(index,k);
+                POP(index,k) = temp;
+                break;
             }
         }
     }
@@ -190,7 +188,7 @@ int main (void) {
 	cudaFree(problem);
 	cudaFree(fitness);
 	cudaFree(sorted_fitness);
-	cudaFree(prefix_sort_fintess);
+	cudaFree(prefix_sort_fitness);
 	cudaFree(new_population);
 	
 	return 0;
