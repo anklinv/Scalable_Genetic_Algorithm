@@ -46,6 +46,11 @@ vi sumAndMinRuntimes;
 vi evaluateRuntimes;
 vi sortRuntimes;
 
+vi eliteWrite;
+vi fitnessCorrect;
+vi breedRest;
+vi writeBack;
+
 /*
  For debugging.
  */
@@ -177,8 +182,22 @@ TravellingSalesmanProblem::~TravellingSalesmanProblem() {
     cout << "accumulated runtime sum and min: " << accSumAndMin << "s" << endl;
     cout << "accumulated runtime sort: " << accSort << "s" << endl;
     cout << "accumulated runtime evaluate: " << accEvaluate << "s" << endl;
-    cout << "--------------------------" << endl;
     
+    
+    double accEliteWrite = (double)accumulate(eliteWrite.begin(), eliteWrite.end(), 0) / (double)1e9;
+    double accFitnessCorrect = (double)accumulate(fitnessCorrect.begin(), fitnessCorrect.end(), 0) / (double)1e9;
+    double accBreedRest = (double)accumulate(breedRest.begin(), breedRest.end(), 0) / (double)1e9;
+    double accWriteBack = (double)accumulate(writeBack.begin(), writeBack.end(), 0) / (double)1e9;
+    
+    
+    cout << "--------------------------" << endl;
+    cout << "accumulated runtime elite write: " << accEliteWrite << "s" << endl;
+    cout << "accumulated runtime fitness correct: " << accFitnessCorrect << "s" << endl;
+    cout << "accumulated runtime breed rest: " << accBreedRest << "s" << endl;
+    cout << "accumulated runtime write back: " << accWriteBack << "s" << endl;
+    
+    
+    cout << "--------------------------" << endl;
     cout << "(total accumulated runtime: " << (accRuntimeRank+accRuntimeBreed+accRuntimeMutate) / (double)1e9 << ")" << endl;
     
     cout << "runtime SOLVE: " << runtimeSolve / (double)1e9 << endl;
@@ -1016,7 +1035,13 @@ void TravellingSalesmanProblem::breed_population() {
     // TODO: make this global (don't allocate, free, allocate, free, ... as this is "huge")
     // in order to speed things up
     //Int temp_population[this->population_count][this->problem_size];
+   
+#ifdef microbenchmark_breed
+    hrTime tStart, tEnd;
+    int delta;
     
+    tStart = myClock.now();
+#endif
     
     // TODO: start SIMD version
     __m256i geneSegSIMD;
@@ -1052,23 +1077,68 @@ void TravellingSalesmanProblem::breed_population() {
     }*/
     // TODO: end sequential version
 
+
+#ifdef microbenchmark_breed
+    tEnd = myClock.now();
+    delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+    eliteWrite.push_back(delta);
+    
+    tStart = myClock.now();
+#endif
+    
     
     // TODO: start SIMD version
+    __m256 fitnessWeightsSIMD;
     
+    const __m256 ONES_SIMD = _mm256_set1_ps(Real(1.0));
+    Real fitnessConstant = Real(1) / fitness_sum;
+    __m256 fitnessConstantSIMD = _mm256_set1_ps(fitnessConstant);
     
+    int indivIdx = 0;
+    for(; indivIdx <= population_count - 8; indivIdx = indivIdx + 8) {
+        fitnessWeightsSIMD = _mm256_load_ps(&fitness[indivIdx]); // load from fitness
+        // normalize
+        fitnessWeightsSIMD = _mm256_mul_ps(fitnessWeightsSIMD, fitnessConstantSIMD);
+        // emulate pow
+        fitnessWeightsSIMD = _mm256_mul_ps(fitnessWeightsSIMD, fitnessWeightsSIMD);
+        fitnessWeightsSIMD = _mm256_mul_ps(fitnessWeightsSIMD, fitnessWeightsSIMD);
+        // invert
+        fitnessWeightsSIMD = _mm256_div_ps(ONES_SIMD, fitnessWeightsSIMD);
+
+        _mm256_store_ps(&fitnessWeights[indivIdx], fitnessWeightsSIMD);
+    }
+    for(; indivIdx < population_count; indivIdx++) {
+        fitnessWeights[indivIdx] = fitnessConstant * fitness[indivIdx];
+        fitnessWeights[indivIdx] = pow(fitnessWeights[indivIdx], 4);
+        fitnessWeights[indivIdx] = 1.0 / fitnessWeights[indivIdx];
+    }
+    auto dist = std::discrete_distribution<>(fitnessWeights, fitnessWeights + population_count);
     // TODO: end SIMD version
     
     
     // TODO: start sequential version
-    vector<double> correct_fitness(this->population_count);
+    /*vector<double> correct_fitness(this->population_count);
+    //double fc = 1.0 / this->fitness_sum;
     for (int i = 0; i < this->population_count; ++i) {
         correct_fitness[i] = 1 / pow(this->fitness[i] / this->fitness_sum, 4);
+        //correct_fitness[i] = fc / this->fitness[i];
+        //double tmp = 1 / pow(this->fitness[i] / this->fitness_sum, 4);
+        //assert(abs(tmp - fitnessWeights[i]) / tmp < 1e-5);
     }
+    
+    auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());*/
     // TODO: end sequential version
 
     
-    auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());
-
+#ifdef microbenchmark_breed
+    tEnd = myClock.now();
+    delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+    fitnessCorrect.push_back(delta);
+    
+    tStart = myClock.now();
+#endif
+    
+    
     // Breed any random individuals
     for (int i = this->elite_size; i < this->population_count; ++i) {
         int rand1 = dist(gen);
@@ -1080,13 +1150,48 @@ void TravellingSalesmanProblem::breed_population() {
         //this->breed(rand1, rand2, &(this->population[i*problem_size]));
     }
     
-    for (int i = 0; i < this->population_count; ++i) {
-        for (int j = 0; j < this->problem_size; ++j) {
-            VAL_POP(i, j);
-            POP(i, j) = temp_population[i*problem_size + j];
+    
+#ifdef microbenchmark_breed
+    tEnd = myClock.now();
+    delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+    breedRest.push_back(delta);
+    
+    tStart = myClock.now();
+#endif
+    
+    // TODO: start SIMD version
+    popIdx = 0;
+    for(; popIdx < population_count; popIdx++) {
+        int geneIdx = 0;
+        for(; geneIdx <= problem_size - 8; geneIdx = geneIdx + 8) {
+            geneSegSIMD = _mm256_load_si256((__m256i *)&temp_population[popIdx * problem_size + geneIdx]);
+            _mm256_store_si256((__m256i *)&POP(popIdx, geneIdx), geneSegSIMD);
+        }
+        for(; geneIdx < problem_size; geneIdx++) {
+            POP(popIdx, geneIdx) = temp_population[popIdx * problem_size + geneIdx];
         }
     }
+    // TODO: end SIMD version
+    
+    
+    // TODO: start scalar version
+    /*for (int i = 0; i < this->population_count; ++i) {
+        for (int j = 0; j < this->problem_size; ++j) {
+            VAL_POP(i, j);
+            //assert(POP(i, j) == temp_population[i*problem_size + j]);
+            POP(i, j) = temp_population[i*problem_size + j];
+        }
+    }*/
+    // TODO: end scalar version
+    
     //this->logger->LOG_WC(BREED_POPULATION_END);
+
+    
+#ifdef microbenchmark_breed
+    tEnd = myClock.now();
+    delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
+    writeBack.push_back(delta);
+#endif
     
 }
 
