@@ -595,7 +595,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
             offsetsSIMD = _mm256_add_epi32(offsetsSIMD, geneSegSIMD);
             
             // make sure cities is aligned to 32 in memory
-            distancesSIMD = _mm256_i32gather_epi32(cities, offsetsSIMD, 4);
+            distancesSIMD = _mm256_i32gather_ps(cities, offsetsSIMD, 4);
             
             // 6-7 5-6 4-5 3-4 2-3 1-2 0-1 x
             
@@ -607,7 +607,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
         // (use mask to eliminate garbage)
         __m256i garbageMaskSIMD = _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
                                                  0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0);
-        sumDistancesSIMD = _mm256_and_si256(sumDistancesSIMD, garbageMaskSIMD);
+        sumDistancesSIMD = (__m256)_mm256_and_si256((__m256i)sumDistancesSIMD, garbageMaskSIMD);
             
         // compute horizontal sum
         sumDistancesSIMD = _mm256_hadd_ps(sumDistancesSIMD, sumDistancesSIMD); // sums of 2 candidates
@@ -628,27 +628,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
         // TODO: end SIMD version
     } else if(sizeof(Int) == 2) { // 16-bit version
         // TODO: start SIMD version
-        // compute how many mask elements are covered by a __m256i
-        const int INC_GENE = 16;
-        
-        Real sumDistances = 0;
-        __m256 sumDistancesSIMD1 = _mm256_set1_ps(0);
-        __m256 sumDistancesSIMD2 = _mm256_set1_ps(0);
-        
-        const __m256i PROBLEM_SIZE_SIMD = _mm256_set1_epi32(problem_size);
-        
-        __m256i offsetsSIMD1;
-        __m256i offsetsSIMD2;
-        
-        // distances of the current gene segment
-        // (8 indices means 7 distances)
-        // ok ok ok ok ok ok ok garbage
-        __m256 distancesSIMD1;
-        __m256 distancesSIMD2;
-        
-        int geneIdx = 0;
-        
-        
+
         // TODO: end SIMD version
     }
     
