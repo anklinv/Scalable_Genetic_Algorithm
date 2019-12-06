@@ -17,9 +17,6 @@
 #include <thrust/binary_search.h>
 #include <thrust/extrema.h>
 
-#include <thrust/host_vector.h>
-#include <thrust/device_vector.h>
-
 #define POP_SIZE 1000
 #define PROB_SIZE 48
 #define EPOCHS 1000
@@ -162,9 +159,8 @@ int main (void) {
     //arrays needed for problem
     individual_t *population, *new_population; // population_t
     float (*problem)[PROB_SIZE]; // problem_t
-	float /**fitness, */*fitness_prefix_sum; // population_fitness_t
+	float *fitness, *fitness_prefix_sum; // population_fitness_t
     int *sorted_fitness_idxs;
-    thrust::device_vector<float> fitness(POP_SIZE);
 
 	//random device
 	random_device rd;
@@ -174,7 +170,7 @@ int main (void) {
 	cudaMallocManaged(&problem, sizeof(problem_t));
 	cudaMallocManaged(&population, sizeof(population_t));
 	cudaMallocManaged(&new_population, sizeof(population_t));
-	// cudaMallocManaged(&fitness, sizeof(population_fitness_t));
+	cudaMallocManaged(&fitness, sizeof(population_fitness_t));
 	cudaMallocManaged(&fitness_prefix_sum, sizeof(population_fitness_t));
 	cudaMallocManaged(&sorted_fitness_idxs, POP_SIZE * sizeof(int));
 
@@ -225,7 +221,7 @@ int main (void) {
         //     }
         //     cout << endl;
         // }
-        cout << *thrust::max_element(fitness.begin(), fitness.end()) << endl;
+        cout << *thrust::max_element(fitness, fitness + POP_SIZE) << endl;
         
         // TODO this actually changes order of fitness, but not population
 		// //perform a sort of the fitness values to implement the elitism strategy
@@ -245,8 +241,8 @@ int main (void) {
         for (int j = 0; j < ISLANDS; j++) {
             thrust::inclusive_scan(
                 thrust::device,
-                &fitness[j * ISLAND_POP_SIZE],
-                &fitness[(j + 1) * ISLAND_POP_SIZE],
+                fitness + j * ISLAND_POP_SIZE,
+                fitness + (j + 1) * ISLAND_POP_SIZE,
                 fitness_prefix_sum + j * ISLAND_POP_SIZE
             );
         }
@@ -261,7 +257,7 @@ int main (void) {
 	cudaFree(problem);
 	cudaFree(population);
 	cudaFree(new_population);
-	// cudaFree(fitness);
+	cudaFree(fitness);
 	cudaFree(fitness_prefix_sum);
 	cudaFree(sorted_fitness_idxs);
 	
