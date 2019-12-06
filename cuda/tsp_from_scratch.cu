@@ -96,10 +96,15 @@ __global__ void crossover_and_migrate(
         prob_mask[j] = 0;
     }
 
-    // Fill the first half of the child with the first parent
-    // Store visited cities in a bitmask
+    // Partially fill the child with a random chunk of the first parent
+    // Store visited cities in the bitmask
     int *curr_gene = new_individual;
-    for (int j = 0; j < PROB_SIZE / 2; j++) {
+    int gene_a = ceilf(curand_uniform(&s) * PROB_SIZE) - 1;
+    int gene_b = ceilf(curand_uniform(&s) * PROB_SIZE) - 1;
+    int gene_min, gene_max;
+    if (gene_a > gene_b)    { gene_max = gene_a; gene_min = gene_b; }
+    else                    { gene_min = gene_a; gene_max = gene_b; }
+    for (int j = gene_min; j < gene_max; j++) {
         *curr_gene++ = parent_1[j];
         prob_mask[parent_1[j] / 32] |= 1 << (parent_1[j] % 32);
     }
