@@ -551,5 +551,5 @@ void TravellingSalesmanProblem::setFitness(int indivIdx, double newFitness) { //
 }
 
 double TravellingSalesmanProblem::getMinFitness() { // for Island
-    return *min_element(fitness.begin(), fitness.end());
+    return this->fitness_best;
 }

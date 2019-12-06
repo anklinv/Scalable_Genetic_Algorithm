@@ -33,13 +33,13 @@ COMMUNICATION(communication) { // initializer list
     genes = TSP.getGenes();
     
     
-    // allocate buffers
+    // compute sizes of send buffers and receive buffers
     numIndividualsSendBuffer = computeSendBufferSize();
     numIndividualsReceiveBuffer = computeReceiveBufferSize(numIndividualsSendBuffer);
-    
+    // allocate send buffers
     sendBufferGenes = new Int[numIndividualsSendBuffer * numIntegersGene];
     sendBufferFitness = new double[numIndividualsSendBuffer];
-    
+    // allocate receive buffers
     receiveBufferGenes = new Int[numIndividualsReceiveBuffer * numIntegersGene];
     receiveBufferFitness = new double[numIndividualsReceiveBuffer];
     
@@ -259,21 +259,16 @@ void Island::stochasticUniversalSampling(int* sampledIndividuals, int numIndivid
 
 
 void Island::truncationSelection(int* sampledIndividuals, int numIndividualsToSample) {
-    
     //double lastFitness = -1;
     //double currFitness = -1;
-    
     for(int indivIdx = 0; indivIdx < numIndividualsToSample; indivIdx++) {
-     
         sampledIndividuals[indivIdx] = ranks[indivIdx];
-        
         //currFitness = TSP.getFitness(ranks[indivIdx]);
         //if (indivIdx != 0) {
         //    assert(lastFitness <= currFitness);
         //}
         //lastFitness = currFitness;
     }
-    
 }
 
 
@@ -288,19 +283,22 @@ void Island::pureRandomSelection(int* sampledIndividuals, int numIndividualsToSa
 
 
 void Island::truncationReplacement(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses) {
-    
     // Use (idx, fitness) pairs to facilitate sorting
-    Individual immigrants[numImmigrants];
-    
+    Individual immigrants[numImmigrants - numIndividualsSendBuffer];
+
+    int helperIdx = 0;
     for(int immigrantIdx = 0; immigrantIdx < numImmigrants; immigrantIdx++) {
-        
-        (immigrants[immigrantIdx]).idx = immigrantIdx;
-        (immigrants[immigrantIdx]).fitness = immigrantFitnesses[immigrantIdx];
+        if(immigrantIdx < rankID * numIndividualsSendBuffer || (rankID + 1) * numIndividualsSendBuffer <= immigrantIdx) {
+            (immigrants[helperIdx]).idx = immigrantIdx;
+            (immigrants[helperIdx]).fitness = immigrantFitnesses[immigrantIdx];
+            helperIdx++;
+        }
     }
+    assert(helperIdx == numImmigrants - numIndividualsSendBuffer);
     
     // Sort incoming data in ascending order
     // (the data of the current island is already sorted)
-    sort(immigrants, immigrants + numImmigrants);
+    sort(immigrants, immigrants + (numImmigrants - numIndividualsSendBuffer));
     
     
     // Determine how many individuals of the island are going to be replaced
@@ -309,10 +307,10 @@ void Island::truncationReplacement(int numImmigrants, Int* immigrantGenes, doubl
     int immigrantIdx = 0;
     int islandIndivIdx = 0;
     
-    int offsetIsland = numIndividualsIsland - numImmigrants;
+    int offsetIsland = numIndividualsIsland - (numImmigrants - numIndividualsSendBuffer);
     
-    while(immigrantIdx < numImmigrants
-          && islandIndivIdx < numImmigrants) {
+    while(immigrantIdx < (numImmigrants - numIndividualsSendBuffer)
+          && islandIndivIdx < (numImmigrants - numIndividualsSendBuffer)) {
         
         double currFitnessImmigrant = (immigrants[immigrantIdx]).fitness;
         double currFitnessIslandIndiv = TSP.getFitness(ranks[offsetIsland + islandIndivIdx]);
@@ -335,13 +333,12 @@ void Island::truncationReplacement(int numImmigrants, Int* immigrantGenes, doubl
     // - the ranks stored in the TSP object are no longer correct after this step
     for(int indivIdx = 0; indivIdx < numToReplace; indivIdx++) {
         
-        Int* currGene = &genes[ranks[(numIndividualsIsland - numImmigrants) + indivIdx] * numIntegersGene];
+        Int* currGene = &genes[ranks[(numIndividualsIsland - 1) - indivIdx] * numIntegersGene];
         Int* newGene = &immigrantGenes[immigrants[indivIdx].idx * numIntegersGene];
         
         overwriteGene(newGene, currGene, numIntegersGene);
         
-        TSP.setFitness(ranks[(numIndividualsIsland - numImmigrants) + indivIdx],
-                       immigrants[indivIdx].fitness);
+        // don't update fitness
     }
     
 }
@@ -397,87 +394,68 @@ void Island::crowdingReplacement(int numImmigrants, Int* immigrantGenes, double*
 
 
 int Island::computeSendBufferSize() { // TODO: could be implemented in a more functional way
-    
     switch(MIGRATION_TOPOLOGY) {
-            
         case MigrationTopology::FULLY_CONNECTED: {
-            
-            int numSenders = sizeCommWorld - 1;
-            
-            if (numSenders == 0) { // bug fix for mpiexec -np 1
+            int numExternalSenders = sizeCommWorld - 1;
+            if (numExternalSenders == 0) { // bug fix for mpiexec -np 1
+                // this would cause a division by zero
                 return 0;
             }
-            
-            if (NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION % numSenders == 0) {
-                return max(1, NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION / numSenders);
+            if (NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION == 0) {
+                // treat this case separatly
+                return 0;
+            }
+            if (NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION % numExternalSenders == 0) {
+                return NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION / numExternalSenders;
             } else {
-                return max(1, NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION / numSenders + 1);
+                return (NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION / numExternalSenders) + 1; // ceil
             }
             break;
         }
-            
         case MigrationTopology::ISOLATED: {
-            
             return 0;
             break;
         }
-            
         case MigrationTopology::RING: {
-            
             return NUM_INDIVIDUALS_RECEIVED_PER_MIGRATION;
             break;
         }
-            
         default: {
             return -1; // error
         }
-            
     } // end switch case
-    
 }
 
 
 int Island::computeReceiveBufferSize(int sendBufferSize) { // TODO: could be implemented in a more functional way
-    
     switch (MIGRATION_TOPOLOGY) {
-            
         case MigrationTopology::FULLY_CONNECTED: {
-            
             // sizeCommWorld is total number of ranks using MPI_Allgather
+            // see semantics of MPI_Allgather
             return sendBufferSize * sizeCommWorld;
             break;
         }
-            
         case MigrationTopology::ISOLATED: {
-            
             return 0;
             break;
         }
-            
         case MigrationTopology::RING: {
-            
             return sendBufferSize;
             break;
         }
-            
         default: {
             return -1; // error
         }
-            
     } // end switch case
-    
 }
 
 
 void Island::fillSendBuffers() { // TODO: could be implemented in a more functional way
-    
+    // used as out parameter
     int migrants[numIndividualsSendBuffer]; // store indices of individuals
     
-    
     switch(SELECTION_POLICY) {
-        
         case SelectionPolicy::TRUNCATION: {
-            
             truncationSelection(migrants, numIndividualsSendBuffer);
             break;
         }
@@ -507,52 +485,40 @@ void Island::fillSendBuffers() { // TODO: could be implemented in a more functio
         }
             
     } // end switch case
-    
-    
     for(int migrantIdx = 0; migrantIdx < numIndividualsSendBuffer; migrantIdx++) {
-        
         // simply copy array
         overwriteGene(&genes[migrants[migrantIdx] * numIntegersGene],
-                      &sendBufferGenes[migrantIdx * numIntegersGene], numIntegersGene);
+                      &sendBufferGenes[migrantIdx * numIntegersGene],
+                      numIntegersGene);
     }
-    
     for(int migrantIdx = 0; migrantIdx < numIndividualsSendBuffer; migrantIdx++) {
-        
         sendBufferFitness[migrantIdx] = TSP.getFitness(migrants[migrantIdx]);
     }
-    
 }
 
 
 void Island::doSynchronousBlockingCommunication() { // TODO: could be implemented in a more functional way
-    
     switch(MIGRATION_TOPOLOGY) {
-        
         case MigrationTopology::FULLY_CONNECTED: {
-            
-            fillSendBuffers();
-            
+            fillSendBuffers(); // fill send buffers
             // "Gathers data from all tasks and distribute the combined data to all tasks"
             // - I suppose this is synchronized
             // - amount of data sent == amount of data received from any process
             MPI_Allgather(sendBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
-                          receiveBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE, MPI_COMM_WORLD);
-            
+                          receiveBufferFitness, numIndividualsSendBuffer, MPI_DOUBLE,
+                          MPI_COMM_WORLD);
             MPI_Allgather(sendBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT,
-                          receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT, MPI_COMM_WORLD);
-            
-            emptyReceiveBuffers();
-            
+                          receiveBufferGenes, numIndividualsSendBuffer * numIntegersGene, CUSTOM_MPI_INT,
+                          MPI_COMM_WORLD);
+            emptyReceiveBuffers(); // empty receive buffers
             break;
         }
-        
         case MigrationTopology::ISOLATED: {
             
             int status = MPI_Barrier(MPI_COMM_WORLD); // Synchronize islands
             //assert(status == MPI_SUCCESS);
             break;
         }
-        
         case MigrationTopology::RING: {
             
             // A cyclic list seems to be a good use case for MPI_Sendrecv
@@ -586,9 +552,7 @@ void Island::doSynchronousBlockingCommunication() { // TODO: could be implemente
                         
             break;
         }
-        
     } // end switch case
-    
 }
 
 
@@ -834,26 +798,17 @@ void Island::doNonblockingCommunicationCleanup() {
 
 
 void Island::emptyReceiveBuffers() { // TODO: maybe use a function pointer which is set inside the constructor
-    
     switch(REPLACEMENT_POLICY) {
-            
         case ReplacementPolicy::TRUNCATION:
-            
             truncationReplacement(numIndividualsReceiveBuffer, receiveBufferGenes, receiveBufferFitness);
             break;
-        
         case ReplacementPolicy::PURE_RANDOM:
-            
             pureRandomReplacement(numIndividualsReceiveBuffer, receiveBufferGenes, receiveBufferFitness);
             break;
-            
         case ReplacementPolicy::DEJONG_CROWDING:
-            
             crowdingReplacement(numIndividualsReceiveBuffer, receiveBufferGenes, receiveBufferFitness);
             break;
-            
     } // end switch case
-    
 }
 
 
@@ -1054,21 +1009,17 @@ void Island::cleanupRMACommunication() {
 
 
 void Island::solveBlocking(const int numEvolutions) {
-    
     int numPeriods = numEvolutions / MIGRATION_PERIOD;
-    
     for(int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
         // Run the GA for MIGRATION_PERIOD iterations
         TSP.solve(MIGRATION_PERIOD, rankID);
         // MPI part (Migration part)
         doSynchronousBlockingCommunication();
     }
-    
     // deal with excess iterations that no more fit in a migration period
     if (numEvolutions % MIGRATION_PERIOD != 0) {
         TSP.solve(numEvolutions % MIGRATION_PERIOD, rankID);
     }
-    
 }
 
 
@@ -1157,26 +1108,22 @@ void Island::solveRMA(const int numEvolutions) {
 
 
 double Island::solve(const int numEvolutions) {
-        
+    int numReceived = numIndividualsReceiveBuffer - numIndividualsSendBuffer;
+    assert(numReceived <= numIndividualsIsland);
     switch(COMMUNICATION) {
-            
         case UnderlyingCommunication::BLOCKING: {
             solveBlocking(numEvolutions);
             break;
         }
-            
         case UnderlyingCommunication::NON_BLOCKING: {
             solveNonblocking(numEvolutions);
             break;
         }
-            
         case UnderlyingCommunication::RMA: {
             solveRMA(numEvolutions);
             break;
         }
     } // end switch case
-    
-    
     return TSP.getMinFitness();
 }
 

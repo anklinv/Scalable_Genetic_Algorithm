@@ -52,7 +52,7 @@ int migration_amount = 5;
 Island::MigrationTopology migration_topology = Island::MigrationTopology::FULLY_CONNECTED;
 
 // --selection_policy {pure_random, truncation, fitness_proportionate_selection, stochastic_universal_sampling, tournament_selection}
-Island::SelectionPolicy selection_policy = Island::SelectionPolicy::TOURNAMENT_SELECTION;
+Island::SelectionPolicy selection_policy = Island::SelectionPolicy::TRUNCATION;
 
 // --replacement_policy {pure_random, truncation, dejong_crowding}
 Island::ReplacementPolicy replacement_policy = Island::ReplacementPolicy::TRUNCATION;
@@ -195,7 +195,7 @@ void parse_args(int argc, char** argv, bool verbose_args=false) {
             if (verbose_args) {
                 cout << "Verbose:\t" << argv[i+1] << endl;
             }
-        } else if (argv[i] == (string) "--migration_topology") {
+        } /*else if (argv[i] == (string) "--migration_topology") {
             assert(i + 1 < argc);
             if (argv[i+1] == (string) "isolated") {
                 migration_topology = Island::MigrationTopology::ISOLATED;
@@ -259,7 +259,7 @@ void parse_args(int argc, char** argv, bool verbose_args=false) {
             if (verbose_args) {
                 cout << "Communication:\t" << argv[i+1] << endl;
             }
-        }
+        }*/
     }
 }
 
