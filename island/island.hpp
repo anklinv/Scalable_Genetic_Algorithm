@@ -9,6 +9,7 @@
 #include <cassert> // for debugging
 
 #include "../sequential/travelling_salesman_problem.hpp"
+#include "../logging/logging.hpp"
 
 
 using namespace std;
@@ -108,8 +109,16 @@ private:
     
     /// Underlying MPI communication
     const UnderlyingCommunication COMMUNICATION;
-    
-    
+
+    /// For logging computation and communication times
+    std::chrono::high_resolution_clock clock;
+    std::chrono::time_point<std::chrono::high_resolution_clock> comm_start;
+    std::chrono::time_point<std::chrono::high_resolution_clock> comm_end;
+    uint64_t comm_duration;
+    std::chrono::time_point<std::chrono::high_resolution_clock> comp_start;
+    std::chrono::time_point<std::chrono::high_resolution_clock> comp_end;
+    uint64_t comp_duration;
+
     /// For convenience. Size of MPI_COMM_WORLD.  It is necessary that all ranks in MPI_COMM_WORLD execute
     /// the GA simultaneously.
     int sizeCommWorld;

@@ -42,6 +42,9 @@ public:
     /// 2D coordinates of the cities
     float* cities;
 
+    /// How often to write
+    int log_iter_freq;
+
     void set_logger(Logger *_logger);
 
     /// Solve the problem by evolving for a given number of steps.
@@ -64,15 +67,12 @@ public:
     
     /// Returns the minimum (best) fitness value. For Island.
     double getMinFitness();
-    
-    
-    /// Getter method to access the "gene" of a single individual (??)
-    int* getGene(int indivIdx);
+
+    /// Logger object
+    Logger *logger;
     
 
 private:
-    /// Logger object
-    Logger *logger;
 
     /// Pointer to the population indices, which has size population_count * problem_size
     Int* population;
@@ -87,9 +87,6 @@ private:
 
     /// For randomness
     std::mt19937 gen;
-
-    /// How often to write
-    int log_iter_freq;
     
     /// A counter to count the number of evolution steps done since object creation. This is necessary because
     /// an Island calls solve() multiple times.

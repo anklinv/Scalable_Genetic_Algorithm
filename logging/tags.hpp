@@ -37,3 +37,7 @@
 // -----------------------------------------------------------------------------
 
 #define LOGGING_TAG_VAL_BEST_FITNESS    0x03000000
+
+#define LOGGING_TAG_VAL_COMPUTATION     0x04000000
+
+#define LOGGING_TAG_VAL_COMMUNICATION   0x05000000

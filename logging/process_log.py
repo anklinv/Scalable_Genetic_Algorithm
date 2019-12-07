@@ -183,6 +183,7 @@ class Epochs(object):
     #     self.end = None
     #     self.best_fitness = None
 
+    # Old depreviated verison
     def process_epochs_in_log(self) -> None:
         Epoch = namedtuple('Epoch', ['begin', 'end', 'fitness'])
 
@@ -201,6 +202,26 @@ class Epochs(object):
                 end = next(value for (tag_id, value) in it if tag_id == end_tag_id)
                 self.epochs.append(Epoch(
                     begin=float(begin)/1e3,
+                    end=float(end)/1e3,
+                    fitness=fitness
+                ))
+        except StopIteration:
+            pass
+
+    def process_epochs_in_log_new(self) -> None:
+        Epoch = namedtuple('Epoch', ['end', 'fitness'])
+
+        # get relevant tag IDs for fast lookups
+        end_tag_id = self.tags.tag_names['wc_epoch_end']
+        fitness_tag_id = self.tags.tag_names['val_best_fitness']
+
+        it = iter(self.log.log)
+        self.epochs: [Epoch] = []
+        try:
+            while True:
+                fitness = next(value for (tag_id, value) in it if tag_id == fitness_tag_id)
+                end = next(value for (tag_id, value) in it if tag_id == end_tag_id)
+                self.epochs.append(Epoch(
                     end=float(end)/1e3,
                     fitness=fitness
                 ))

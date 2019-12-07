@@ -23,7 +23,9 @@ COMMUNICATION(communication) { // initializer list
     //assert(status == MPI_SUCCESS);
     MPI_Comm_size(MPI_COMM_WORLD, &sizeCommWorld);
     //assert(status == MPI_SUCCESS);
-        
+
+    // Initialize clock
+    this->clock = std::chrono::high_resolution_clock();
     
     // convenience variables
     numIntegersGene = TSP.problem_size;
@@ -1010,11 +1012,29 @@ void Island::cleanupRMACommunication() {
 
 void Island::solveBlocking(const int numEvolutions) {
     int numPeriods = numEvolutions / MIGRATION_PERIOD;
-    for(int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
+    comp_duration = 0;
+    comm_duration = 0;
+    int logging_frequency = TSP.log_iter_freq / MIGRATION_PERIOD + 1;
+    for (int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
         // Run the GA for MIGRATION_PERIOD iterations
+        comp_start = clock.now();
         TSP.solve(MIGRATION_PERIOD, rankID);
+        comp_end = clock.now();
+        comp_duration += std::chrono::duration_cast<std::chrono::microseconds>(comp_end - comp_start).count();
+
         // MPI part (Migration part)
+        comm_start = clock.now();
         doSynchronousBlockingCommunication();
+        comm_end = clock.now();
+        comm_duration += std::chrono::duration_cast<std::chrono::microseconds>(comm_end - comm_start).count();
+
+        // Log if necessary
+        if (currPeriod % logging_frequency == 0) {
+            TSP.logger->LOG(COMPUTATION, comp_duration / logging_frequency);
+            TSP.logger->LOG(COMMUNICATION, comm_duration / logging_frequency);
+            comp_duration = 0;
+            comm_duration = 0;
+        }
     }
     // deal with excess iterations that no more fit in a migration period
     if (numEvolutions % MIGRATION_PERIOD != 0) {
@@ -1033,11 +1053,20 @@ void Island::solveNonblocking(const int numEvolutions) {
     }
     // needs doNonblockingCommunication() or doNonblockingCommunicationCleanup()
     // to be called after this
-    
-    for(int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
+
+    comp_duration = 0;
+    comm_duration = 0;
+    int logging_frequency = min(1, TSP.log_iter_freq / MIGRATION_PERIOD);
+    for (int currPeriod = 0; currPeriod < numPeriods; currPeriod++) {
+
         // Run the GA for MIGRATION_PERIOD iterations
+        comp_start = clock.now();
         TSP.solve(MIGRATION_PERIOD, rankID);
+        comp_end = clock.now();
+        comp_duration += std::chrono::duration_cast<std::chrono::microseconds>(comp_end - comp_start).count();
+
         // MPI part (Migration part)
+        comm_start = clock.now();
         if(currPeriod < numPeriods - 1) {
             doNonblockingCommunication();
             // needs doNonblockingCommunication() or doNonblockingCommunicationCleanup()
@@ -1045,6 +1074,16 @@ void Island::solveNonblocking(const int numEvolutions) {
         } else {
             // don't initiate any new nonblocking send, recv
             doNonblockingCommunicationCleanup();
+        }
+        comm_end = clock.now();
+        comm_duration += std::chrono::duration_cast<std::chrono::microseconds>(comm_end - comm_start).count();
+
+        // Log if necessary
+        if (currPeriod % logging_frequency == 0) {
+            TSP.logger->LOG(COMPUTATION, comp_duration);
+            TSP.logger->LOG(COMMUNICATION, comm_duration);
+            comp_duration = 0;
+            comm_duration = 0;
         }
     }
     
@@ -1081,8 +1120,9 @@ void Island::solveRMA(const int numEvolutions) {
                 // continue polling as we also check for data which can arrive any time
                 startMigration = false;
             }
+
             // POLLING_PERIOD
-            TSP.solve(POLLING_PERIOD, rankID);
+            TSP.solve(MIGRATION_PERIOD, rankID);
         }
         
         // deal with excess iterations that no more fit in a polling period
