@@ -18,6 +18,9 @@ using namespace std;
 
 // Global variables (parameters)
 
+// --log_freq
+int log_freq = 100;
+
 // --epochs
 int nr_epochs = 1000;
 
@@ -195,6 +198,17 @@ void parse_args(int argc, char** argv, bool verbose_args=false) {
             if (verbose_args) {
                 cout << "Verbose:\t" << argv[i+1] << endl;
             }
+        } else if (argv[i] == (string) "--log_freq") {
+            assert(i + 1 < argc);
+            try {
+                log_freq = stoi(argv[i + 1]);
+            } catch (const std::invalid_argument &e) {
+                cerr << "Invalid integer for " << argv[i] << endl;
+                exit(1);
+            }
+            if (verbose_args) {
+                cout << "Log Frequency:\t" << argv[i+1] << endl;
+            }
         } /*else if (argv[i] == (string) "--migration_topology") {
             assert(i + 1 < argc);
             if (argv[i+1] == (string) "isolated") {
@@ -338,7 +352,8 @@ int main(int argc, char** argv) {
     assert(number_cities != -1);
 
     // Create problem
-    TravellingSalesmanProblem problem(number_cities, node_edge_mat, nr_individuals, elite_size, mutation, verbose);
+    TravellingSalesmanProblem problem(number_cities, node_edge_mat, nr_individuals, elite_size, mutation, verbose,
+            log_freq);
 
     // Sequential version WITHOUT MPI
     if (mode == 0) {

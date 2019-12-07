@@ -57,7 +57,8 @@ hrClock myClock;
 
 
 TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, float* cities,
-        const int population_count, const int elite_size, const int mutation_rate, const int verbose) {
+        const int population_count, const int elite_size, const int mutation_rate, const int verbose,
+        const int log_freq) {
     this->verbose = verbose;
     this->problem_size = problem_size;
     this->population_count = population_count;
@@ -69,7 +70,7 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, flo
     random_device rd;
     this->gen = mt19937(rd());
 
-    this->log_iter_freq = 100;
+    this->log_iter_freq = log_freq;
 
     // Initialize fields to be initialized later
     this->logger = nullptr;
@@ -209,7 +210,9 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
 #endif*/
 
     for (int epoch = 0; epoch < nr_epochs; ++epoch) {
+#ifdef legacy_logging
         this->logger->LOG_WC(EPOCH_BEGIN);
+#endif
         if (this->verbose > 0) {
             if (epoch % this->log_iter_freq == 0) {
                 cout << epoch << " of " << nr_epochs << endl;
@@ -229,8 +232,15 @@ double TravellingSalesmanProblem::solve(const int nr_epochs, const int rank) {
         }
 #endif
         this->evolutionCounter = this->evolutionCounter + 1;
+#ifdef legacy_logging
         this->logger->LOG(BEST_FITNESS, this->fitness_best);
         this->logger->LOG_WC(EPOCH_END);
+#else
+        if (this->evolutionCounter % this->log_iter_freq == 0) {
+            this->logger->LOG(BEST_FITNESS, this->fitness_best);
+            this->logger->LOG_WC(EPOCH_END);
+        }
+#endif
     }
     
     // Island assumes the ranks to be sorted before a migration starts
