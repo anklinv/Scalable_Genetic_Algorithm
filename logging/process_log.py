@@ -184,7 +184,7 @@ class Epochs(object):
     #     self.best_fitness = None
 
     # Old depreviated verison
-    def process_epochs_in_log(self) -> None:
+    def process_epochs_in_log_legacy(self) -> None:
         Epoch = namedtuple('Epoch', ['begin', 'end', 'fitness'])
 
         # get relevant tag IDs for fast lookups
@@ -208,7 +208,7 @@ class Epochs(object):
         except StopIteration:
             pass
 
-    def process_epochs_in_log_new(self) -> None:
+    def process_epochs_in_log(self) -> None:
         Epoch = namedtuple('Epoch', ['end', 'fitness'])
 
         # get relevant tag IDs for fast lookups
@@ -327,7 +327,6 @@ def generate_fitness_wc_dataframe(log_dir, name, tag_loc="tags.hpp"):
     # Save to disk
     df.to_csv(file_name, compression="gzip", index=False)
     return df
-
 
 def generate_periods_dataframe(log_dir, name, tag_loc="tags.hpp"):
     assert isinstance(name, str), "name must be a string"
