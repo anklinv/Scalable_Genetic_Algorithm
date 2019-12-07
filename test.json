@@ -1,0 +1,30 @@
+{
+  "name" : "Runtime test",
+  "repetitions" : 1,
+  "fixed_params" : {
+    "--mutation": 10,
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "truncation",
+    "--replacement_policy": "truncation",
+    "mode": "island",
+    "-n" : 4,
+    "--population": 64,
+    "--elite_size": 32,
+    "--epochs" : 10000,
+    "--migration_period": 50,
+    "--migration_amount": 32,
+    "--log_freq": 100
+  },
+  "variable_params" : {
+    "--data" : {
+      "type": "list",
+      "list": [
+        "berlin52.csv",
+        "bier127.csv",
+        "a280.csv",
+        "d1291.csv",
+        "u2319.csv"
+      ]
+    }
+  }
+}

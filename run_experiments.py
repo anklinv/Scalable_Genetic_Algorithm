@@ -101,6 +101,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Running some experiments")
     parser.add_argument('--dry_run', default=False, dest="dry_run", action="store_true",
                         help="Whether to just print the jobs for debugging")
+    parser.add_argument('--dir', type=str, default="logs", dest="dir",
+                        help="Directory to log to")
     parser.add_argument('-e', type=str, default=['experiment.json'], nargs="+", dest="experiment",
                         help="Which experiment file to run")
     args = parser.parse_args()
@@ -130,7 +132,7 @@ if __name__ == "__main__":
 
         # Create folder
         experiment_name = create_filename(experiment_name)
-        experiment_dir = os.path.join("logs", experiment_name, "")
+        experiment_dir = os.path.join(args.dir, experiment_name, "")
         if args.dry_run:
             print("This will create the folder {}".format(experiment_dir))
         else:
