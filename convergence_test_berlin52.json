@@ -1,0 +1,100 @@
+{
+  "name": "convergence test berlin52",
+  "repetitions": 5,
+  "fixed_params": {
+    "--data": "berlin52.csv",
+    "--mutation": 10,
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "truncation",
+    "--replacement_policy": "truncation",
+    "mode": "island",
+    "-n": 4,
+    "--migration_period": 50
+  },
+  "variable_params": {
+    "pop": {
+      "type": "tuple",
+      "names": [
+        "--population",
+        "--elite_size",
+        "--migration_amound",
+        "--epochs",
+        "--log_freq"
+      ],
+      "values": [
+        {
+          "value": [
+            4,
+            2,
+            2,
+            820510000,
+            82051
+          ]
+        },
+        {
+          "value": [
+            8,
+            4,
+            4,
+            410260000,
+            41026
+          ]
+        },
+        {
+          "value": [
+            16,
+            8,
+            8,
+            205130000,
+            20513
+          ]
+        },
+        {
+          "value": [
+            32,
+            16,
+            16,
+            102560000,
+            10256
+          ]
+        },
+        {
+          "value": [
+            64,
+            32,
+            32,
+            51280000,
+            5128
+          ]
+        },
+        {
+          "value": [
+            128,
+            64,
+            64,
+            25640000,
+            2564
+          ]
+        },
+        {
+          "value": [
+            256,
+            128,
+            128,
+            12820000,
+            1282
+          ]
+        },
+        {
+          "value": [
+            512,
+            256,
+            256,
+            6410000,
+            641
+          ]
+        }
+      ]
+    }
+  }
+}

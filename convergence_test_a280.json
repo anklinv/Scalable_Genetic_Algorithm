@@ -1,0 +1,100 @@
+{
+  "name": "convergence test a280",
+  "repetitions": 5,
+  "fixed_params": {
+    "--data": "a280.csv",
+    "--mutation": 10,
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "truncation",
+    "--replacement_policy": "truncation",
+    "mode": "island",
+    "-n": 4,
+    "--migration_period": 50
+  },
+  "variable_params": {
+    "pop": {
+      "type": "tuple",
+      "names": [
+        "--population",
+        "--elite_size",
+        "--migration_amound",
+        "--epochs",
+        "--log_freq"
+      ],
+      "values": [
+        {
+          "value": [
+            4,
+            2,
+            2,
+            320640000,
+            32064
+          ]
+        },
+        {
+          "value": [
+            8,
+            4,
+            4,
+            160320000,
+            16032
+          ]
+        },
+        {
+          "value": [
+            16,
+            8,
+            8,
+            80160000,
+            8016
+          ]
+        },
+        {
+          "value": [
+            32,
+            16,
+            16,
+            40080000,
+            4008
+          ]
+        },
+        {
+          "value": [
+            64,
+            32,
+            32,
+            20040000,
+            2004
+          ]
+        },
+        {
+          "value": [
+            128,
+            64,
+            64,
+            10020000,
+            1002
+          ]
+        },
+        {
+          "value": [
+            256,
+            128,
+            128,
+            5010000,
+            501
+          ]
+        },
+        {
+          "value": [
+            512,
+            256,
+            256,
+            2510000,
+            251
+          ]
+        }
+      ]
+    }
+  }
+}
