@@ -1,12 +1,13 @@
 import json
+import math
 
 # in minutes
 estimated_runtime = 15
-elite_size = lambda x: x//2
-migration_amount = lambda x: x//2
+n = 4
+population_sizes = [8, 16, 32, 64, 128, 256, 512, 1024]
+elite_size = lambda x: x // 2
+migration_amount = lambda x: math.floor(x // (2 * (n - 1))) * (n - 1)
 log_freq = lambda x: x // 10000
-
-population_sizes = [4, 8, 16, 32, 64, 128, 256, 512]
 
 base_times = {
     "berlin52": 1.755,
@@ -30,13 +31,13 @@ for data in base_times.keys():
     fixed_params["--selection_policy"] = "truncation"
     fixed_params["--replacement_policy"] = "truncation"
     fixed_params["mode"] = "island"
-    fixed_params["-n"] = 4
+    fixed_params["-n"] = n
     fixed_params["--migration_period"] = 50
     experiment["fixed_params"] = fixed_params
     variable_params = dict()
     pop = dict()
     pop["type"] = "tuple"
-    pop["names"] = ["--population", "--elite_size", "--migration_amound", "--epochs", "--log_freq"]
+    pop["names"] = ["--population", "--elite_size", "--migration_amount", "--epochs", "--log_freq"]
     values = list()
     for population in population_sizes:
         value = dict()
