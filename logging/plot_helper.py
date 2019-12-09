@@ -24,11 +24,6 @@ def create_barplot(df, ax, hue="n", nr_bars=10, rnd=-1, ylog=False, thresholds=N
         if hue in df:
             to_keep.append(hue)
 
-
-        if "epoch" in df:
-            df = df.drop(columns=["epoch"])
-
-
         df = df.groupby(to_keep, as_index=False)
 
         # at max wall clock time min fitness was reached for sure
@@ -73,13 +68,11 @@ def create_barplot(df, ax, hue="n", nr_bars=10, rnd=-1, ylog=False, thresholds=N
     order.sort()
     order = list(reversed(order))
 
-    if "n" in df:
-        chart = sns.barplot(ax=ax, x="threshold", y="wall clock time", hue="n", data=plot_df, order=order, palette="autumn")
-    else:
-        chart = sns.barplot(ax=ax, x="threshold", y="wall clock time", data=plot_df, order=order, palette="autumn")
+    chart = sns.barplot(ax=ax, x="threshold", y="wall clock time", hue=hue, data=plot_df, order=order, palette="autumn")
     if ylog:
         chart.set_yscale("log")
     chart.set_xticklabels(chart.get_xticklabels(), rotation=90)
+    return plot_df
 
 
 def create_violinplot(df, ax):
