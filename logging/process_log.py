@@ -8,6 +8,7 @@ import struct
 import json
 import pandas as pd
 from collections import OrderedDict
+from tqdm.notebook import tqdm
 
 
 class Tags(object):
@@ -329,6 +330,8 @@ def generate_fitness_wc_dataframe(log_dir, name, tag_loc="tags.hpp"):
     return df
 
 def generate_periods_dataframe(log_dir, name, tag_loc="tags.hpp"):
+    from itertools import count
+
     assert isinstance(name, str), "name must be a string"
     assert os.path.isdir(log_dir), "log_dir must be a directory"
     assert os.path.isfile(tag_loc), f"Could not find tag_loc {tag_loc}"
@@ -351,29 +354,12 @@ def generate_periods_dataframe(log_dir, name, tag_loc="tags.hpp"):
         # Extract repetitions
         repetitions = json_file["repetitions"]
 
-        # Make sure we are running on island mode
-        mode = None
-        if "mode" in json_file["fixed_params"]:
-            mode = json_file["fixed_params"]["mode"]
-        elif "mode" in json_file["variable_params"]:
-            mode = json_file["variable_params"]["mode"]
-        assert mode and mode == "island", "Only works with island runs"
-
-        # Extract migration_period
-        migration_period = -1
-        if "--migration_period" in json_file["fixed_params"]:
-            migration_period = json_file["fixed_params"]["--migration_period"]
-        elif "--migration_period" in json_file["variable_params"]:
-            raise NotImplementedError
-        else:
-            raise NotImplementedError
-
     # Find unique runs (without repetitions)
     all_names = list(filter(lambda x: os.path.isdir(os.path.join(log_dir, x)), all_names))
     unique_names = list(set(map(lambda x: "_".join(x.split("_")[:-1]), all_names)))
 
     df = None
-    for run_name in unique_names:
+    for run_name in tqdm(unique_names):
         params = run_name.split("_")
 
         # Get parameter names
@@ -386,26 +372,40 @@ def generate_periods_dataframe(log_dir, name, tag_loc="tags.hpp"):
                 param_names.append(key)
         param_names = list(map(lambda x: x.replace("-", ""), param_names))
 
-        for repetition in range(repetitions):
+        for repetition in tqdm(range(repetitions)):
             folder_name = run_name + "_" + str(repetition)
             folder_contents = os.listdir(os.path.join(log_dir, folder_name))
             folder_contents = list(filter(lambda x: ".bin" in x, folder_contents))
             for filename in folder_contents:
                 log = Log(os.path.join(log_dir, folder_name, filename), tags)
                 rank = int(filename.split("_")[-2])
+
+                val_tag_id = tags.tag_names["val_computation"]
+                comp_values = [value for (tag_id, value) in log.log if tag_id == val_tag_id]
+                val_tag_id = tags.tag_names["val_communication"]
+                comm_values = [value for (tag_id, value) in log.log if tag_id == val_tag_id]
+
                 if df is None:
-                    df = pd.DataFrame(log.get_epoch_comp_comm_dataframe(migration_period), columns=["period", "computation time", "communication time"])
+                    df = pd.DataFrame(zip(count(), comp_values, comm_values), columns=["period", "computation time", "communication time"])
                     df["rank"] = rank
                     df["rep"] = repetition
                     for param, param_name in zip(params, param_names):
                         df[param_name] = param
                 else:
-                    df2 = pd.DataFrame(log.get_epoch_comp_comm_dataframe(migration_period), columns=["period", "computation time", "communication time"])
+                    df2 = pd.DataFrame(zip(count(), comp_values, comm_values), columns=["period", "computation time", "communication time"])
                     df2["rank"] = rank
                     df2["rep"] = repetition
                     for param, param_name in zip(params, param_names):
                         df2[param_name] = param
                     df = df.append(df2, ignore_index=True)
+
+    comp_df = df.drop(columns="communication time")
+    comp_df = comp_df.rename(columns={"computation time" : "time"})
+    comp_df["type"] = "computation"
+    comm_df = df.drop(columns="computation time")
+    comm_df = comm_df.rename(columns={"communication time" : "time"})
+    comm_df["type"] = "communication"
+    new_df = comp_df.append(comm_df, ignore_index=True)
 
     # Figure out correct file ending
     if name.endswith(".gz"):
@@ -414,9 +414,9 @@ def generate_periods_dataframe(log_dir, name, tag_loc="tags.hpp"):
         file_name = name + "_periods.gz"
 
     # Save to disk
-    df.to_csv(file_name, compression="gzip", index=False)
+    new_df.to_csv(file_name, compression="gzip", index=False)
 
-    return df
+    return new_df
 
 
 if __name__ == "__main__":
