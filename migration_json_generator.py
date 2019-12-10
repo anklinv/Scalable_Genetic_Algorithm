@@ -2,15 +2,15 @@ import json
 import math
 
 # in minutes
-estimated_runtime = 3
+estimated_runtime = 2
 n = 4
+repetitions = 5
 population_sizes = [64, 256, 768]
 migration_amounts = [lambda x: math.floor(x // (1 * (n - 1))) * (n - 1),
-                     lambda x: math.floor(x // (1.5 * (n - 1))) * (n - 1),
                      lambda x: math.floor(x // (2 * (n - 1))) * (n - 1),
                      lambda x: math.floor(x // (4 * (n - 1))) * (n - 1),
                      lambda x: math.floor(x // (8 * (n - 1))) * (n - 1)]
-migration_periods = [5, 10, 20, 40, 80, 160]
+migration_periods = [10, 25, 50, 100]
 elite_size = lambda x: x // 2
 log_freq = lambda x: x // 1000
 
@@ -26,7 +26,7 @@ base_epochs = 100000
 for data in base_times.keys():
     experiment = dict()
     experiment["name"] = f"convergence test {data}"
-    experiment["repetitions"] = 5
+    experiment["repetitions"] = repetitions
     fixed_params = dict()
     fixed_params["--data"] = data + ".csv"
     fixed_params["--mutation"] = 10
@@ -41,9 +41,11 @@ for data in base_times.keys():
     pop["type"] = "tuple"
     pop["names"] = ["--population", "--elite_size", "--migration_amount", "--epochs", "--log_freq", "--migration_period"]
     values = list()
+    job_count = 0
     for population in population_sizes:
         for migration_amount in migration_amounts:
             for migration_period in migration_periods:
+                job_count += 1
                 value = dict()
                 multiplier = base_population / population
                 epochs = int(round((estimated_runtime * 60 / base_times[data]) * base_epochs * multiplier, -4))
@@ -63,4 +65,4 @@ for data in base_times.keys():
     with open(f"migration_test_{data}.json", mode="w") as file:
         json.dump(experiment, file, indent=2)
 
-print(f"Estimated run time: {estimated_runtime * len(values)} min per problem")
+print(f"Estimated run time: {estimated_runtime * job_count * repetitions / 60} h per problem")
