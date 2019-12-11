@@ -1,14 +1,8 @@
 #include <iostream>
+#include <fstream>
 #include <algorithm>
-#include <cstdlib>
-#include <iostream>
-#include <limits>
 #include <random>
-#include <set>
 #include <chrono>
-#include <array>
-#include <cassert>
-#include <math.h>
 
 #include <curand_kernel.h>
 
@@ -18,8 +12,10 @@
 #include <thrust/extrema.h>
 
 #define POP_SIZE 512
-#define PROB_SIZE 48
-#define EPOCHS 100
+#define PROB_SIZE 280
+#define PROB_FILE_NAME "a280.tsp"
+#define EPOCHS 100000
+#define EPOCHS_REPORT_INTERVAL 1000
 #define ISLANDS 1
 #define MUTATION_RATE 0.05f
 // #define MIGRATION 5	//integer determining how many members migrate from one island
@@ -49,7 +45,7 @@ __global__ void rank_individuals(
     int index = threadIdx.x + blockIdx.x * blockDim.x;
     individual_t &i = population[index];
     float distance = 0;
-    // iterate over edges of an individual
+    // Iterate over edges of an individual
     for (int j = 0; j < PROB_SIZE - 1; j++) {
         int from = i[j];
         int to = i[j + 1];
@@ -82,7 +78,7 @@ __global__ void crossover_and_migrate(
         fitness_prefix_sum + (island + 1) * ISLAND_POP_SIZE,
         curand_uniform(&s) * fitness_prefix_sum[POP_SIZE-1]
     ) - fitness_prefix_sum;
-    // because fitness is sorted, get the respective population member index
+    // Because fitness is sorted, get the respective population member index
     int parent_1_population_idx = fitness_to_population[parent_1_fitness_idx];
     individual_t &parent_1 = population[parent_1_population_idx];
 
@@ -102,58 +98,54 @@ __global__ void crossover_and_migrate(
         prob_mask[j] = 0;
     }
 
-    // don't cross over when dealing with elites
-    bool crossover = true;
+    // Don't cross over when dealing with elites
     for (int i = ISLAND_POP_SIZE - ELITES; i < ISLAND_POP_SIZE; i++) {
         if (index == fitness_to_population[island * ISLAND_POP_SIZE + i])	{
-            crossover = false;
-            break;
+            return;
         }
     }
-        
-    if (crossover) {
-        // Partially fill the child with a random chunk of the first parent
-        // Store visited cities in the bitmask
-        int *curr_gene = new_individual;
-        int gene_a = ceilf(curand_uniform(&s) * PROB_SIZE) - 1;
-        int gene_b = ceilf(curand_uniform(&s) * PROB_SIZE) - 1;
-        int gene_min, gene_max;
-        if (gene_a > gene_b)	{ gene_max = gene_a; gene_min = gene_b; }
-        else			{ gene_min = gene_a; gene_max = gene_b; }
-        for (int j = gene_min; j < gene_max; j++) {
-            *curr_gene++ = parent_1[j];
-            prob_mask[parent_1[j] / 32] |= 1 << (parent_1[j] % 32);
-        }
 
-        // For the second half of the child we only choose
-        // entries from parent 2 that aren't already in the child
-        for (int j = 0; j < PROB_SIZE; j++) {
-            if ((prob_mask[parent_2[j] / 32] & (1 << (parent_2[j] % 32))) == 0) {
-                *curr_gene++ = parent_2[j];
-            }
-        }
+    // Partially fill the child with a random chunk of the first parent
+    // Store visited cities in the bitmask
+    int *curr_gene = new_individual;
+    int gene_a = ceilf(curand_uniform(&s) * PROB_SIZE) - 1;
+    int gene_b = ceilf(curand_uniform(&s) * PROB_SIZE) - 1;
+    int gene_min, gene_max;
+    if (gene_a > gene_b)	{ gene_max = gene_a; gene_min = gene_b; }
+    else			{ gene_min = gene_a; gene_max = gene_b; }
+    for (int j = gene_min; j < gene_max; j++) {
+        *curr_gene++ = parent_1[j];
+        prob_mask[parent_1[j] / 32] |= 1 << (parent_1[j] % 32);
+    }
 
-        // //perform the migration
-        // int target_island = (island + 1) % ISLANDS;
-        // __shared__ int r_1, r_2;
-        // if (threadIdx.x == 0) {
-        //	 r_1 = rand() % ISLAND_POP_SIZE;
-        //	 r_2 = rand() % ISLAND_POP_SIZE;
-        // }
-        __syncthreads();
-        // //Each thread takes a single gene from one of five
-        // int temp[PROB_SIZE * MIGRATION];
-        // if (threadIdx.x != 0 && threadIdx.x < PROB_SIZE * MIGRATION) {
-        //	 int migrant_index = threadIdx.x - 1;
-        //	 temp[migrant_index] = NPOP(island_1 * ISLAND_POP_SIZE + r_1, remainder(migrant_index, PROB_SIZE));
-        //	 NPOP(island_1 * POP_SIZE / ISLAND + r_1, remainder(migrant_index, PROB_SIZE)) = NPOP(island_2 * ISLAND_POP_SIZE + r_2, remainder(migrant_index, PROB_SIZE))
-        //	 NPOP(island_2 * POP_SIZE / ISLAND + r_2, remainder(migrant_index, PROB_SIZE)) = temp[migrant_index];
-        // }
-
-        // Overwrite existing population with the newly created one
-        for (int j = 0; j < PROB_SIZE; j++) {
-            population[index][j] = new_individual[j];
+    // For the second half of the child we only choose
+    // entries from parent 2 that aren't already in the child
+    for (int j = 0; j < PROB_SIZE; j++) {
+        if ((prob_mask[parent_2[j] / 32] & (1 << (parent_2[j] % 32))) == 0) {
+            *curr_gene++ = parent_2[j];
         }
+    }
+
+    // //perform the migration
+    // int target_island = (island + 1) % ISLANDS;
+    // __shared__ int r_1, r_2;
+    // if (threadIdx.x == 0) {
+    //	 r_1 = rand() % ISLAND_POP_SIZE;
+    //	 r_2 = rand() % ISLAND_POP_SIZE;
+    // }
+    __syncthreads();
+    // //Each thread takes a single gene from one of five
+    // int temp[PROB_SIZE * MIGRATION];
+    // if (threadIdx.x != 0 && threadIdx.x < PROB_SIZE * MIGRATION) {
+    //	 int migrant_index = threadIdx.x - 1;
+    //	 temp[migrant_index] = NPOP(island_1 * ISLAND_POP_SIZE + r_1, remainder(migrant_index, PROB_SIZE));
+    //	 NPOP(island_1 * POP_SIZE / ISLAND + r_1, remainder(migrant_index, PROB_SIZE)) = NPOP(island_2 * ISLAND_POP_SIZE + r_2, remainder(migrant_index, PROB_SIZE))
+    //	 NPOP(island_2 * POP_SIZE / ISLAND + r_2, remainder(migrant_index, PROB_SIZE)) = temp[migrant_index];
+    // }
+
+    // Overwrite existing population with the newly created one
+    for (int j = 0; j < PROB_SIZE; j++) {
+        population[index][j] = new_individual[j];
     }
 }
 
@@ -164,7 +156,7 @@ __global__ void mutate(population_t population){
     curandState s;
     curand_init(index, 0, 0, &s);
 
-    if (curand_uniform(&s) < MUTATION_RATE) {
+    if (curand_uniform(&s) <= MUTATION_RATE) {
         int gene_a_idx = ceilf(curand_uniform(&s) * PROB_SIZE) - 1;
         int gene_b_idx = ceilf(curand_uniform(&s) * PROB_SIZE) - 1;
         int gene_a = i[gene_a_idx];
@@ -182,7 +174,7 @@ int main (void) {
     float *fitness, *fitness_prefix_sum; // population_fitness_t
     int *fitness_to_population;
 
-    //random device
+    // random device
     random_device rd;
     mt19937 gen = mt19937(rd());
 
@@ -200,13 +192,28 @@ int main (void) {
         tmp_indices[i] = i;
     }
 
-    //initialize problem (random for now, from file later)
+    // Initialize problem
     float problem_x[PROB_SIZE], problem_y[PROB_SIZE];
-    uniform_real_distribution<float> dis(0.0f, 100.0f);
+
+    // Generate random data
+    // uniform_real_distribution<float> dis(0.0f, 100.0f);
+    // for (int i = 0; i < PROB_SIZE; i++) {
+    //     problem_x[i] = dis(gen);
+    //     problem_y[i] = dis(gen);
+    // }
+
+    // Read data from a file
+    std::ifstream f(PROB_FILE_NAME);
+    char buf[80];
+    int city;
+    do {
+        f.getline(buf, sizeof(buf) / sizeof(*buf));
+    } while (strcmp(buf, "NODE_COORD_SECTION") != 0);
     for (int i = 0; i < PROB_SIZE; i++) {
-        problem_x[i] = dis(gen);
-        problem_y[i] = dis(gen);
+        f >> city >> problem_x[i] >> problem_y[i];
     }
+
+    // Calculate distance matrix
     for (int i = 0; i < PROB_SIZE; i++) {
         for (int j = 0; j < PROB_SIZE; j++) {
             problem[i][j] = sqrt(
@@ -216,7 +223,7 @@ int main (void) {
         }
     }
 
-    //initialize population (random)
+    // Randomly initialize population
     for (int i = 0; i < POP_SIZE; ++i) {
         shuffle(tmp_indices.begin(), tmp_indices.end(), gen);
         for (int j = 0; j < PROB_SIZE; ++j) {
@@ -224,9 +231,9 @@ int main (void) {
         }
     }
 
-    //run GA
+    // Run GA
     for (int epoch = 0; epoch < EPOCHS; epoch++){
-        //begin epoch by ranking fitness of population
+        // Begin epoch by ranking fitness of population
         rank_individuals<<<ISLANDS, ISLAND_POP_SIZE>>>(
             population,
             problem,
@@ -242,14 +249,14 @@ int main (void) {
         // 	 }
         // 	 cout << endl;
         // }
-        cout << *thrust::max_element(fitness, fitness + POP_SIZE) << endl;
+        if (epoch % EPOCHS_REPORT_INTERVAL == 0) {
+            cout << 1 / *thrust::max_element(fitness, fitness + POP_SIZE) << endl;
+        }
         
-        // TODO this actually changes order of fitness, but not population
-        // perform a sort of the fitness values to implement the elitism strategy
+        // Perform a sort of the fitness values to implement the elitism strategy
         for (int i = 0; i < POP_SIZE; ++i) {
              fitness_to_population[i] = i;
         }
-
         for (int j = 0; j < ISLANDS; j++) {
              thrust::sort_by_key(
                  thrust::device,
@@ -260,7 +267,7 @@ int main (void) {
         }
         // cout << fitness_to_population[0] << fitness_to_population[POP_SIZE-1] << endl;
 
-        //perform a prefix sum of the fitness in order to easily perform roulette wheel selection of a suitable parent
+        // Perform a prefix sum of the fitness in order to easily perform roulette wheel selection of a suitable parent
         for (int j = 0; j < ISLANDS; j++) {
             thrust::inclusive_scan(
                 thrust::device,
@@ -270,7 +277,7 @@ int main (void) {
             );
         }
         
-        //perform crossover on the islands
+        // Perform crossover on the islands
         crossover_and_migrate<<<ISLANDS, ISLAND_POP_SIZE>>>(
             population,
             fitness_prefix_sum,
@@ -279,7 +286,7 @@ int main (void) {
         );
         cudaDeviceSynchronize();
   
-        //mutate the population
+        // Mutate the population
         mutate<<<ISLANDS, ISLAND_POP_SIZE>>>(population);
         cudaDeviceSynchronize();
     }
