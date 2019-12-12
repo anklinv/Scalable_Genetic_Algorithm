@@ -2,7 +2,7 @@ import json
 import math
 
 # in minutes
-estimated_runtime = 5
+estimated_runtime = 2
 repetitions = 5
 
 # Result of grid search
