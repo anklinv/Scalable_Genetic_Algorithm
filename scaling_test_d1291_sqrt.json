@@ -1,0 +1,114 @@
+{
+  "name": "scaling test d1291",
+  "repetitions": 5,
+  "fixed_params": {
+    "--data": "d1291.csv",
+    "--mutation": 10,
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "truncation",
+    "--replacement_policy": "truncation",
+    "--migration_period": 25
+  },
+  "variable_params": {
+    "pop": {
+      "type": "tuple",
+      "names": [
+        "--population",
+        "--elite_size",
+        "-n",
+        "--epochs",
+        "--log_freq",
+        "--migration_amount"
+      ],
+      "values": [
+        {
+          "value": [
+            128,
+            64,
+            1,
+            350000,
+            350,
+            16
+          ]
+        },
+        {
+          "value": [
+            90,
+            45,
+            2,
+            500000,
+            500,
+            11
+          ]
+        },
+        {
+          "value": [
+            64,
+            32,
+            4,
+            710000,
+            710,
+            8
+          ]
+        },
+        {
+          "value": [
+            45,
+            22,
+            8,
+            1010000,
+            1010,
+            5
+          ]
+        },
+        {
+          "value": [
+            36,
+            18,
+            12,
+            1260000,
+            1260,
+            4
+          ]
+        },
+        {
+          "value": [
+            32,
+            16,
+            16,
+            1420000,
+            1420,
+            4
+          ]
+        },
+        {
+          "value": [
+            26,
+            13,
+            24,
+            1740000,
+            1740,
+            3
+          ]
+        },
+        {
+          "value": [
+            22,
+            11,
+            32,
+            2060000,
+            2060,
+            2
+          ]
+        }
+      ]
+    },
+    "mode": {
+      "type": "list",
+      "list": [
+        "island",
+        "naive"
+      ]
+    }
+  }
+}

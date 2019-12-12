@@ -202,7 +202,7 @@ if __name__ == "__main__":
                 repetition_logging_location = os.path.join(experiment_dir, job_string, "")
                 if not args.dry_run:
                     if os.path.isdir(repetition_logging_location):
-                        print("Folder {} already exists... exiting".format(experiment_dir))
+                        print("Folder {} already exists... exiting".format(repetition_logging_location))
                         exit(1)
                     else:
                         os.mkdir(repetition_logging_location)

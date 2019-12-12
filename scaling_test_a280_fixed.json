@@ -1,0 +1,114 @@
+{
+  "name": "scaling test a280",
+  "repetitions": 5,
+  "fixed_params": {
+    "--data": "a280.csv",
+    "--mutation": 10,
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "truncation",
+    "--replacement_policy": "truncation",
+    "--migration_period": 25
+  },
+  "variable_params": {
+    "pop": {
+      "type": "tuple",
+      "names": [
+        "--population",
+        "--elite_size",
+        "-n",
+        "--epochs",
+        "--log_freq",
+        "--migration_amount"
+      ],
+      "values": [
+        {
+          "value": [
+            768,
+            384,
+            1,
+            220000,
+            220,
+            96
+          ]
+        },
+        {
+          "value": [
+            768,
+            384,
+            2,
+            220000,
+            220,
+            96
+          ]
+        },
+        {
+          "value": [
+            768,
+            384,
+            4,
+            220000,
+            220,
+            96
+          ]
+        },
+        {
+          "value": [
+            768,
+            384,
+            8,
+            220000,
+            220,
+            96
+          ]
+        },
+        {
+          "value": [
+            768,
+            384,
+            12,
+            220000,
+            220,
+            96
+          ]
+        },
+        {
+          "value": [
+            768,
+            384,
+            16,
+            220000,
+            220,
+            96
+          ]
+        },
+        {
+          "value": [
+            768,
+            384,
+            24,
+            220000,
+            220,
+            96
+          ]
+        },
+        {
+          "value": [
+            768,
+            384,
+            32,
+            220000,
+            220,
+            96
+          ]
+        }
+      ]
+    },
+    "mode": {
+      "type": "list",
+      "list": [
+        "island",
+        "naive"
+      ]
+    }
+  }
+}
