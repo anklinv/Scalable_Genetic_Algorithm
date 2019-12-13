@@ -12,14 +12,13 @@ def create_barplot(df, ax, hue="n", nr_bars=10, rnd=-1, ylog=False, thresholds=N
     assert "wall clock time" in df, "Wall clock time not in dataframe"
     assert hue in df, "Hue not in dataframe"
 
-
-    if "rank" in df: # do aggregation over ranks
+    if "rank" in df:  # do aggregation over ranks
 
         to_keep = ["epoch"]
         if "n" in df:
             to_keep.append("n")
         if "rep" in df:
-            to_keep.append("rep") # used for confidence interval
+            to_keep.append("rep")  # used for confidence interval
 
         if hue in df:
             to_keep.append(hue)
@@ -28,16 +27,15 @@ def create_barplot(df, ax, hue="n", nr_bars=10, rnd=-1, ylog=False, thresholds=N
 
         # at max wall clock time min fitness was reached for sure
         # it is at max wall clock time when the result of an epoch is known
-        df = df.agg({"fitness" : "min", "wall clock time" : "max"})
-
+        df = df.agg({"fitness": "min", "wall clock time": "max"})
 
     # Calculate start and end of thresholds
     if "n" in df and "rep" in df:
-        max_fitness = df.groupby(["n", "rep"]).agg({"fitness" : "max"}).fitness.min()
-        min_fitness = df.groupby(["n", "rep"]).agg({"fitness" : "min"}).fitness.max()
+        max_fitness = df.groupby(["n", "rep"]).agg({"fitness": "max"}).fitness.min()
+        min_fitness = df.groupby(["n", "rep"]).agg({"fitness": "min"}).fitness.max()
     elif "n" in df:
-        max_fitness = df.groupby(["n"]).agg({"fitness" : "max"}).fitness.min()
-        min_fitness = df.groupby(["n"]).agg({"fitness" : "min"}).fitness.max()
+        max_fitness = df.groupby(["n"]).agg({"fitness": "max"}).fitness.min()
+        min_fitness = df.groupby(["n"]).agg({"fitness": "min"}).fitness.max()
     else:
         max_fitness = df.fitness.max()
         min_fitness = df.fitness.min()
@@ -55,7 +53,7 @@ def create_barplot(df, ax, hue="n", nr_bars=10, rnd=-1, ylog=False, thresholds=N
     # Generate dataframe for plotting
     plot_df = None
     for threshold in thresholds:
-        tmp_df = df[df.fitness <= threshold].groupby(to_keep, as_index=False).agg({"wall clock time" : "min"})
+        tmp_df = df[df.fitness <= threshold].groupby(to_keep, as_index=False).agg({"wall clock time": "min"})
         tmp_df["threshold"] = threshold
 
         if plot_df is None:
@@ -79,10 +77,10 @@ def create_violinplot(df, ax):
     # Preprocess dataframe if necessary
     if "communication time" in df and "computation time" in df and not "time" in df and not "type" in df:
         comp_df = df.drop(columns="communication time")
-        comp_df = comp_df.rename(columns={"computation time" : "time"})
+        comp_df = comp_df.rename(columns={"computation time": "time"})
         comp_df["type"] = "computation"
         comm_df = df.drop(columns="computation time")
-        comm_df = comm_df.rename(columns={"communication time" : "time"})
+        comm_df = comm_df.rename(columns={"communication time": "time"})
         comm_df["type"] = "communication"
         new_df = comp_df.append(comm_df, ignore_index=True)
     else:
@@ -149,12 +147,41 @@ if __name__ == "__main__":
                         help="Create a speedup plot from the data with given hue parameter")
     parser.add_argument('--threshold', dest="threshold", type=int, default=0, help='Threshold to use for speedup plot')
     parser.add_argument('--dir', dest="dir", required=True, help='path to directory with log files or a data frame')
+    parser.add_argument('--dark', default=False, dest="dark", action="store_true",
+                        help="Take all pngs in the directory and turn them into a dark mode version")
     parser.add_argument('-n', dest="n", type=int, help="Select the number of islands from the data frame")
     parser.add_argument('--data', dest="data", type=str, help="Select the data from the data frame")
     parser.add_argument('--save', dest="save", type=str, help="Save the data to a file name instead of showing")
     args = parser.parse_args()
 
-    if args.extract:
+    if args.dark:
+        from PIL import Image
+        import PIL.ImageOps
+
+        for image_file in os.listdir(args.dir):
+            if ".png" in image_file:
+                name, _ = image_file.split(".")
+                image = Image.open(image_file)
+                if image.mode == 'RGBA':
+                    r, g, b, a = image.split()
+                    rgb_image = Image.merge('RGB', (r, g, b))
+
+                    inverted_image = PIL.ImageOps.invert(rgb_image)
+
+                    r2, g2, b2 = inverted_image.split()
+
+                    final_transparent_image = Image.merge('RGBA', (r2, g2, b2, a))
+                    final_transparent_image.save(f'{name}_inv1.png')
+                    final_transparent_image = Image.merge('RGBA', (b2, g2, r2, a))
+                    final_transparent_image.save(f'{name}_inv2.png')
+                else:
+                    inverted_image = PIL.ImageOps.invert(image)
+                    inverted_image.save(f'{name}_inv1.png')
+                    r, g, b = inverted_image.split()
+                    inverted_image = Image.merge('RGB', (r, g, b))
+                    inverted_image.save(f'{name}_inv2.png')
+
+    elif args.extract:
         print("Creating dataframe... ", end="", flush=True)
         name = os.path.split(args.dir.strip("/").strip("\\"))[-1]
         df = generate_fitness_wc_dataframe(args.dir, name)
@@ -181,9 +208,10 @@ if __name__ == "__main__":
                 threshold = args.threshold
             else:
                 # Extract suiting threshold
-                df_n = df.groupby(["n", "rep", "epoch", "migration_period"], as_index=False).agg({"fitness": "min", "wall clock time": "max"}).drop(columns=["epoch"])
-                max_fitness = df_n.groupby("n").agg({"fitness" : "max"}).fitness.min()
-                min_fitness = df_n.groupby("n").agg({"fitness" : "min"}).fitness.max()
+                df_n = df.groupby(["n", "rep", "epoch", "migration_period"], as_index=False).agg(
+                    {"fitness": "min", "wall clock time": "max"}).drop(columns=["epoch"])
+                max_fitness = df_n.groupby("n").agg({"fitness": "max"}).fitness.min()
+                min_fitness = df_n.groupby("n").agg({"fitness": "min"}).fitness.max()
                 thresholds = np.round(np.linspace(min_fitness, max_fitness, num=10), -1).astype(int)
                 threshold = thresholds[-2]
 
