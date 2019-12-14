@@ -20,4 +20,4 @@ fi
 echo "copying files..."
 # add --delete to rsync to delete files on the remote which don't exist locally
 rsync -r $LOCAL_DIR $1@login.leonhard.ethz.ch:$REMOTE_DIR && \
-ssh $1@login.leonhard.ethz.ch "module load cuda && cd $REMOTE_DIR && make && bsub -I -R \"rusage[ngpus_excl_p=1]\" ./Test"
+ssh $1@login.leonhard.ethz.ch "module load cuda && cd $REMOTE_DIR && make && bsub -I -R \"rusage[ngpus_excl_p=1]\" time ./Test"
