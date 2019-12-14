@@ -15,7 +15,8 @@ CUFLAGS= \
 -I. \
 -Xcompiler \
 -fPIC \
--std=c++11
+-std=c++11 \
+-O3
 
 LDFLAGS=-L. -lm -lpthread -lrt
 
