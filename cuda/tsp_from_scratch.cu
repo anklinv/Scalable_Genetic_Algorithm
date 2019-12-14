@@ -11,10 +11,10 @@
 #include <thrust/binary_search.h>
 #include <thrust/extrema.h>
 
-#define POP_SIZE 512
-#define PROB_SIZE 48
-#define PROB_FILE_NAME "att48.tsp"
-#define EPOCHS 100000
+#define POP_SIZE 64
+#define PROB_SIZE 280
+#define PROB_FILE_NAME "a280.tsp"
+#define EPOCHS 10000
 #define EPOCHS_REPORT_INTERVAL 1000
 #define ISLANDS 1
 #define MUTATION_RATE 0.05f
@@ -22,7 +22,7 @@
 #define ISLAND_POP_SIZE (POP_SIZE / ISLANDS)
 #define ELITES (ISLAND_POP_SIZE / 2)
 
-#define DEBUG
+#undef DEBUG
 
 typedef float problem_t[PROB_SIZE][PROB_SIZE];
 
@@ -74,12 +74,16 @@ __global__ void crossover_and_migrate(
     
     // Get indices of the two parents randomly, weighted by fitness value
     // (uses thrust::lower_bound search on the prefix-summed fitness values)
+    float fitness_sum_first = fitness_prefix_sum[island * ISLAND_POP_SIZE];
+    float fitness_sum_last = fitness_prefix_sum[(island + 1) * ISLAND_POP_SIZE - 1];
+    float fitness_sum_diff = fitness_sum_last - fitness_sum_first;
+
     int parent_1_fitness_idx = thrust::lower_bound(
         thrust::device,
         fitness_prefix_sum + island * ISLAND_POP_SIZE,
         fitness_prefix_sum + (island + 1) * ISLAND_POP_SIZE,
-        curand_uniform(&s) * fitness_prefix_sum[POP_SIZE-1]
-    ) - fitness_prefix_sum;
+        fitness_sum_first + curand_uniform(&s) * fitness_sum_diff
+    ) - 1 - fitness_prefix_sum;
     // Because fitness is sorted, get the respective population member index
     int parent_1_population_idx = fitness_to_population[parent_1_fitness_idx];
     individual_t &parent_1 = population[parent_1_population_idx];
@@ -88,8 +92,8 @@ __global__ void crossover_and_migrate(
         thrust::device,
         fitness_prefix_sum + island * ISLAND_POP_SIZE,
         fitness_prefix_sum + (island + 1) * ISLAND_POP_SIZE,
-        curand_uniform(&s) * fitness_prefix_sum[POP_SIZE-1]
-    ) - fitness_prefix_sum;
+        fitness_sum_first + curand_uniform(&s) * fitness_sum_diff
+    ) - 1 - fitness_prefix_sum;
     int parent_2_population_idx = fitness_to_population[parent_2_fitness_idx];
     individual_t &parent_2 = population[parent_2_population_idx];
 
