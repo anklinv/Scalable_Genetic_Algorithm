@@ -288,7 +288,7 @@ int main (void) {
         }
         for (int j = 0; j < ISLANDS; j++) {
              thrust::sort_by_key(
-                 thrust::device,
+                 thrust::host,
                  fitness + j * ISLAND_POP_SIZE,
                  fitness + (j + 1) * ISLAND_POP_SIZE,
                  fitness_to_population + j * ISLAND_POP_SIZE
@@ -299,7 +299,7 @@ int main (void) {
         // Perform a prefix sum of the fitness in order to easily perform roulette wheel selection of a suitable parent
         for (int j = 0; j < ISLANDS; j++) {
             thrust::inclusive_scan(
-                thrust::device,
+                thrust::host,
                 fitness + j * ISLAND_POP_SIZE,
                 fitness + (j + 1) * ISLAND_POP_SIZE,
                 fitness_prefix_sum + j * ISLAND_POP_SIZE
