@@ -12,8 +12,8 @@
 #include <thrust/extrema.h>
 
 #define POP_SIZE 512
-#define PROB_SIZE 280
-#define PROB_FILE_NAME "a280.tsp"
+#define PROB_SIZE 48
+#define PROB_FILE_NAME "att48.tsp"
 #define EPOCHS 100000
 #define EPOCHS_REPORT_INTERVAL 1000
 #define ISLANDS 1
@@ -21,6 +21,8 @@
 // #define MIGRATION 5	//integer determining how many members migrate from one island
 #define ISLAND_POP_SIZE (POP_SIZE / ISLANDS)
 #define ELITES (ISLAND_POP_SIZE / 2)
+
+#define DEBUG
 
 typedef float problem_t[PROB_SIZE][PROB_SIZE];
 
@@ -231,8 +233,31 @@ int main (void) {
         }
     }
 
+    #ifdef DEBUG
+        cerr << "debug on" << endl;
+    #endif
+
     // Run GA
-    for (int epoch = 0; epoch < EPOCHS; epoch++){
+    for (int epoch = 0; epoch < EPOCHS; epoch++) {
+        // Verify integrity of individuals
+        #ifdef DEBUG
+        {
+            const int PROB_MASK_NUM_WORDS = (PROB_SIZE + 31) / 32;
+            uint32_t prob_mask[PROB_MASK_NUM_WORDS];
+            for (int i = 0; i < POP_SIZE; i++) {
+                individual_t &ind = population[i];
+                for (int j = 0; j < PROB_MASK_NUM_WORDS; j++) {
+                    prob_mask[j] = 0;
+                }
+                for (int j = 0; j < PROB_SIZE; j++) {
+                    if ((prob_mask[ind[j] / 32] & (1 << (ind[j] & 31))) != 0) {
+                        cerr << "Assertion error: individuals traverse cities twice" << endl;
+                    }
+                    prob_mask[ind[j] / 32] |= (1 << (ind[j] & 31));
+                }
+            }
+        }
+        #endif
         // Begin epoch by ranking fitness of population
         rank_individuals<<<ISLANDS, ISLAND_POP_SIZE>>>(
             population,
