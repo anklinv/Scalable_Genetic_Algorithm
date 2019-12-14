@@ -301,23 +301,26 @@ def generate_fitness_wc_dataframe(log_dir, name, tag_loc="tags.hpp"):
             folder_name = run_name + "_" + str(repetition)
             folder_contents = os.listdir(os.path.join(log_dir, folder_name))
             folder_contents = list(filter(lambda x: ".bin" in x, folder_contents))
-            for filename in folder_contents:
-                log = Log(os.path.join(log_dir, folder_name, filename), tags)
-                rank = int(filename.split("_")[-2])
-                epochs = Epochs(log, tags)
-                if df is None:
-                    df = pd.DataFrame(epochs.get_fitness_vs_time_dataframe(), columns=["fitness", "wall clock time", "epoch"])
-                    df["rank"] = rank
-                    df["rep"] = repetition
-                    for param, param_name in zip(params, param_names):
-                        df[param_name] = param
-                else:
-                    df2 = pd.DataFrame(epochs.get_fitness_vs_time_dataframe(), columns=["fitness", "wall clock time", "epoch"])
-                    df2["rank"] = rank
-                    df2["rep"] = repetition
-                    for param, param_name in zip(params, param_names):
-                        df2[param_name] = param
-                    df = df.append(df2, ignore_index=True)
+            try:
+                for filename in folder_contents:
+                    log = Log(os.path.join(log_dir, folder_name, filename), tags)
+                    rank = int(filename.split("_")[-2])
+                    epochs = Epochs(log, tags)
+                    if df is None:
+                        df = pd.DataFrame(epochs.get_fitness_vs_time_dataframe(), columns=["fitness", "wall clock time", "epoch"])
+                        df["rank"] = rank
+                        df["rep"] = repetition
+                        for param, param_name in zip(params, param_names):
+                            df[param_name] = param
+                    else:
+                        df2 = pd.DataFrame(epochs.get_fitness_vs_time_dataframe(), columns=["fitness", "wall clock time", "epoch"])
+                        df2["rank"] = rank
+                        df2["rep"] = repetition
+                        for param, param_name in zip(params, param_names):
+                            df2[param_name] = param
+                        df = df.append(df2, ignore_index=True)
+            except ValueError as e:
+                print(f"Run {folder_name} probably crashed... ignoring")
 
     # Figure out correct file ending
     if name.endswith(".gz"):
