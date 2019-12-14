@@ -12,8 +12,8 @@
 #include <thrust/extrema.h>
 
 #define POP_SIZE 64
-#define PROB_SIZE 280
-#define PROB_FILE_NAME "a280.tsp"
+#define PROB_SIZE 1291
+#define PROB_FILE_NAME "d1291.tsp"
 #define EPOCHS 10000
 #define EPOCHS_REPORT_INTERVAL 1000
 #define ISLANDS 1
@@ -57,6 +57,8 @@ __global__ void rank_individuals(
     int first_city = i[0];
     distance += problem[last_city][first_city];
     fitness[index] = 1 / distance;
+    fitness[index] = fitness[index] * fitness[index];
+    fitness[index] = fitness[index] * fitness[index];
 }
 
 __global__ void crossover_and_migrate(
@@ -155,7 +157,7 @@ __global__ void crossover_and_migrate(
     }
 }
 
-__global__ void mutate(population_t population){
+__global__ void mutate(population_t population) {
     int index = threadIdx.x + blockIdx.x * blockDim.x;
     individual_t &i = population[index];
 
@@ -170,6 +172,69 @@ __global__ void mutate(population_t population){
         i[gene_a_idx] = gene_b;
         i[gene_b_idx] = gene_a;
     }
+}
+
+void solve(
+    population_t population,
+    problem_t problem,
+    population_fitness_t fitness,
+    population_fitness_t fitness_prefix_sum,
+    population_t new_population,
+    int *fitness_to_population,
+    bool cold_start
+) {
+    if (cold_start) {
+        // Begin epoch by ranking fitness of population
+        rank_individuals<<<ISLANDS, ISLAND_POP_SIZE>>>(
+            population,
+            problem,
+            fitness
+        );
+        cudaDeviceSynchronize();
+    }
+    
+    // Perform a sort of the fitness values to implement the elitism strategy
+    for (int i = 0; i < POP_SIZE; ++i) {
+         fitness_to_population[i] = i;
+    }
+    for (int j = 0; j < ISLANDS; j++) {
+         thrust::sort_by_key(
+             thrust::host,
+             fitness + j * ISLAND_POP_SIZE,
+             fitness + (j + 1) * ISLAND_POP_SIZE,
+             fitness_to_population + j * ISLAND_POP_SIZE
+         );
+    }
+
+    // Perform a prefix sum of the fitness in order to easily perform roulette wheel selection of a suitable parent
+    for (int j = 0; j < ISLANDS; j++) {
+        thrust::inclusive_scan(
+            thrust::host,
+            fitness + j * ISLAND_POP_SIZE,
+            fitness + (j + 1) * ISLAND_POP_SIZE,
+            fitness_prefix_sum + j * ISLAND_POP_SIZE
+        );
+    }
+    
+    // Perform crossover on the islands
+    crossover_and_migrate<<<ISLANDS, ISLAND_POP_SIZE>>>(
+        population,
+        fitness_prefix_sum,
+        new_population,
+        fitness_to_population
+    );
+    cudaDeviceSynchronize();
+
+    // Mutate the population
+    mutate<<<ISLANDS, ISLAND_POP_SIZE>>>(population);
+    cudaDeviceSynchronize();
+
+    // Finally, rank individuals again
+    rank_individuals<<<ISLANDS, ISLAND_POP_SIZE>>>(
+        population,
+        problem,
+        fitness
+    );
 }
 
 int main (void) {
@@ -238,11 +303,36 @@ int main (void) {
     }
 
     #ifdef DEBUG
-        cerr << "debug on" << endl;
+        cout << "debug on" << endl;
     #endif
 
     // Run GA
+    bool cold_start = true;
     for (int epoch = 0; epoch < EPOCHS; epoch++) {
+        solve(
+            population,
+            problem,
+            fitness,
+            fitness_prefix_sum,
+            new_population,
+            fitness_to_population,
+            cold_start
+        );
+        cold_start = false;
+
+        // cout << "before epoch " << epoch << ": " << endl;
+        // for (int ind = 0; ind < POP_SIZE; ind++) {
+        // 	 cout << "	" << fitness[ind];
+        // 	 for (int gene = 0; gene < PROB_SIZE; gene++) {
+        // 		 cout << " " << population[ind][gene];
+        // 	 }
+        // 	 cout << endl;
+        // }
+        if (epoch % EPOCHS_REPORT_INTERVAL == 0) {
+            cudaDeviceSynchronize();
+            cout << sqrt(sqrt(1 / *thrust::max_element(fitness, fitness + POP_SIZE))) << endl;
+        }
+
         // Verify integrity of individuals
         #ifdef DEBUG
         {
@@ -262,62 +352,6 @@ int main (void) {
             }
         }
         #endif
-        // Begin epoch by ranking fitness of population
-        rank_individuals<<<ISLANDS, ISLAND_POP_SIZE>>>(
-            population,
-            problem,
-            fitness
-        );
-        cudaDeviceSynchronize();
-
-        // cout << "before epoch " << epoch << ": " << endl;
-        // for (int ind = 0; ind < POP_SIZE; ind++) {
-        // 	 cout << "	" << fitness[ind];
-        // 	 for (int gene = 0; gene < PROB_SIZE; gene++) {
-        // 		 cout << " " << population[ind][gene];
-        // 	 }
-        // 	 cout << endl;
-        // }
-        if (epoch % EPOCHS_REPORT_INTERVAL == 0) {
-            cout << 1 / *thrust::max_element(fitness, fitness + POP_SIZE) << endl;
-        }
-        
-        // Perform a sort of the fitness values to implement the elitism strategy
-        for (int i = 0; i < POP_SIZE; ++i) {
-             fitness_to_population[i] = i;
-        }
-        for (int j = 0; j < ISLANDS; j++) {
-             thrust::sort_by_key(
-                 thrust::host,
-                 fitness + j * ISLAND_POP_SIZE,
-                 fitness + (j + 1) * ISLAND_POP_SIZE,
-                 fitness_to_population + j * ISLAND_POP_SIZE
-             );
-        }
-        // cout << fitness_to_population[0] << fitness_to_population[POP_SIZE-1] << endl;
-
-        // Perform a prefix sum of the fitness in order to easily perform roulette wheel selection of a suitable parent
-        for (int j = 0; j < ISLANDS; j++) {
-            thrust::inclusive_scan(
-                thrust::host,
-                fitness + j * ISLAND_POP_SIZE,
-                fitness + (j + 1) * ISLAND_POP_SIZE,
-                fitness_prefix_sum + j * ISLAND_POP_SIZE
-            );
-        }
-        
-        // Perform crossover on the islands
-        crossover_and_migrate<<<ISLANDS, ISLAND_POP_SIZE>>>(
-            population,
-            fitness_prefix_sum,
-            new_population,
-            fitness_to_population
-        );
-        cudaDeviceSynchronize();
-  
-        // Mutate the population
-        mutate<<<ISLANDS, ISLAND_POP_SIZE>>>(population);
-        cudaDeviceSynchronize();
     }
 
     cudaFree(problem);
