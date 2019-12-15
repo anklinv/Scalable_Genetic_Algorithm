@@ -379,28 +379,31 @@ def generate_periods_dataframe(log_dir, name, tag_loc="tags.hpp"):
             folder_name = run_name + "_" + str(repetition)
             folder_contents = os.listdir(os.path.join(log_dir, folder_name))
             folder_contents = list(filter(lambda x: ".bin" in x, folder_contents))
-            for filename in folder_contents:
-                log = Log(os.path.join(log_dir, folder_name, filename), tags)
-                rank = int(filename.split("_")[-2])
+            try:
+                for filename in folder_contents:
+                    log = Log(os.path.join(log_dir, folder_name, filename), tags)
+                    rank = int(filename.split("_")[-2])
 
-                val_tag_id = tags.tag_names["val_computation"]
-                comp_values = [value for (tag_id, value) in log.log if tag_id == val_tag_id]
-                val_tag_id = tags.tag_names["val_communication"]
-                comm_values = [value for (tag_id, value) in log.log if tag_id == val_tag_id]
+                    val_tag_id = tags.tag_names["val_computation"]
+                    comp_values = [value for (tag_id, value) in log.log if tag_id == val_tag_id]
+                    val_tag_id = tags.tag_names["val_communication"]
+                    comm_values = [value for (tag_id, value) in log.log if tag_id == val_tag_id]
 
-                if df is None:
-                    df = pd.DataFrame(zip(count(), comp_values, comm_values), columns=["period", "computation time", "communication time"])
-                    df["rank"] = rank
-                    df["rep"] = repetition
-                    for param, param_name in zip(params, param_names):
-                        df[param_name] = param
-                else:
-                    df2 = pd.DataFrame(zip(count(), comp_values, comm_values), columns=["period", "computation time", "communication time"])
-                    df2["rank"] = rank
-                    df2["rep"] = repetition
-                    for param, param_name in zip(params, param_names):
-                        df2[param_name] = param
-                    df = df.append(df2, ignore_index=True)
+                    if df is None:
+                        df = pd.DataFrame(zip(count(), comp_values, comm_values), columns=["period", "computation time", "communication time"])
+                        df["rank"] = rank
+                        df["rep"] = repetition
+                        for param, param_name in zip(params, param_names):
+                            df[param_name] = param
+                    else:
+                        df2 = pd.DataFrame(zip(count(), comp_values, comm_values), columns=["period", "computation time", "communication time"])
+                        df2["rank"] = rank
+                        df2["rep"] = repetition
+                        for param, param_name in zip(params, param_names):
+                            df2[param_name] = param
+                        df = df.append(df2, ignore_index=True)
+            except ValueError as e:
+                print(f"Run {folder_name} probably crashed... ignoring")
 
     comp_df = df.drop(columns="communication time")
     comp_df = comp_df.rename(columns={"computation time" : "time"})
