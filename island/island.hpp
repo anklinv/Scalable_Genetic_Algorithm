@@ -281,6 +281,7 @@ private:
     /// islandSize is the number of individuals at the island
     /// ranks: individuals are assumed to be sorted. 0 is best, islandSize-1 is worst
     void truncationReplacement(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses);
+    void truncationReplacementFullyConnected(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses);
     
     /// All individuals to be replaced are chosen uniformly at random. It is possible that an immigrant is itself replaced
     /// by a subsequent one.

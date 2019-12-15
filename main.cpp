@@ -209,7 +209,7 @@ void parse_args(int argc, char** argv, bool verbose_args=false) {
             if (verbose_args) {
                 cout << "Log Frequency:\t" << argv[i+1] << endl;
             }
-        } /*else if (argv[i] == (string) "--migration_topology") {
+        } else if (argv[i] == (string) "--migration_topology") {
             assert(i + 1 < argc);
             if (argv[i+1] == (string) "isolated") {
                 migration_topology = Island::MigrationTopology::ISOLATED;
@@ -273,7 +273,7 @@ void parse_args(int argc, char** argv, bool verbose_args=false) {
             if (verbose_args) {
                 cout << "Communication:\t" << argv[i+1] << endl;
             }
-        }*/
+        }
     }
 }
 

@@ -285,6 +285,74 @@ void Island::pureRandomSelection(int* sampledIndividuals, int numIndividualsToSa
 
 
 void Island::truncationReplacement(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses) {
+    
+    if(MIGRATION_TOPOLOGY == MigrationTopology::FULLY_CONNECTED) {
+        
+        // avoid that a processs receives its own data (MPI_Allgather)
+        truncationReplacementFullyConnected(numImmigrants, immigrantGenes, immigrantFitnesses);
+        
+    } else {
+        
+        // Use (idx, fitness) pairs to facilitate sorting
+        Individual immigrants[numImmigrants];
+        
+        for(int immigrantIdx = 0; immigrantIdx < numImmigrants; immigrantIdx++) {
+            
+            (immigrants[immigrantIdx]).idx = immigrantIdx;
+            (immigrants[immigrantIdx]).fitness = immigrantFitnesses[immigrantIdx];
+        }
+        
+        // Sort incoming data in ascending order
+        // (the data of the current island is already sorted)
+        sort(immigrants, immigrants + numImmigrants);
+        
+        
+        // Determine how many individuals of the island are going to be replaced
+        int numToReplace = 0;
+        
+        int immigrantIdx = 0;
+        int islandIndivIdx = 0;
+        
+        int offsetIsland = numIndividualsIsland - numImmigrants;
+        
+        while(immigrantIdx < numImmigrants
+              && islandIndivIdx < numImmigrants) {
+            
+            double currFitnessImmigrant = (immigrants[immigrantIdx]).fitness;
+            double currFitnessIslandIndiv = TSP.getFitness(ranks[offsetIsland + islandIndivIdx]);
+            
+            if(currFitnessImmigrant < currFitnessIslandIndiv) { // immigrant is better
+                
+                numToReplace++;
+                
+                immigrantIdx++;
+                islandIndivIdx++;
+                
+            } else { // island individual is better
+                
+                islandIndivIdx++;
+            }
+        }
+        
+        // Just throw out the numToReplace weakest individuals of the island by replacing their gene
+        // - the fitness is updated too
+        // - the ranks stored in the TSP object are no longer correct after this step
+        for(int indivIdx = 0; indivIdx < numToReplace; indivIdx++) {
+            
+            Int* currGene = &genes[ranks[(numIndividualsIsland - numImmigrants) + indivIdx] * numIntegersGene];
+            Int* newGene = &immigrantGenes[immigrants[indivIdx].idx * numIntegersGene];
+            
+            overwriteGene(newGene, currGene, numIntegersGene);
+            
+            TSP.setFitness(ranks[(numIndividualsIsland - numImmigrants) + indivIdx],
+                           immigrants[indivIdx].fitness);
+        }
+        
+    }
+}
+
+
+void Island::truncationReplacementFullyConnected(int numImmigrants, Int* immigrantGenes, double* immigrantFitnesses) {
     // Use (idx, fitness) pairs to facilitate sorting
     Individual immigrants[numImmigrants - numIndividualsSendBuffer];
 
@@ -969,7 +1037,7 @@ bool Island::doRMAPoll() {
     
 }
 
-
+// this only uses a ring topology
 bool Island::doRMACommunication(bool startMigration) {
     
     // always do this
