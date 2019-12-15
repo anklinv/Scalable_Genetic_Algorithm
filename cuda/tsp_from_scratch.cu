@@ -38,8 +38,8 @@ typedef fitness_t population_fitness_t[POP_SIZE];
 using namespace std;
 
 __device__ fitness_t rank_individual(
-    const individual_t &ind,
-    const problem_t problem
+    const problem_t problem,
+    const individual_t &ind
 ) {
     float distance = 0;
     // Iterate over edges of an individual
@@ -58,12 +58,12 @@ __device__ fitness_t rank_individual(
 }
 
 __global__ void rank_individuals(
-    const population_t population,
     const problem_t problem,
+    const population_t population,
     population_fitness_t fitness
 ) {
     int index = threadIdx.x + blockIdx.x * blockDim.x;
-    fitness[index] = rank_individual(population[index], problem);
+    fitness[index] = rank_individual(problem, population[index]);
 }
 
 __global__ void crossover_individuals(
@@ -168,59 +168,67 @@ __global__ void crossover_individuals(
         old_individual[gene_b_idx] = gene_a;
     }
 
-    fitness[index] = rank_individual(old_individual, problem);
+    fitness[index] = rank_individual(problem, old_individual);
 }
 
+// TODO use struct for arguments
 void solve(
-    population_t population,
-    problem_t problem,
-    population_fitness_t fitness,
-    population_fitness_t fitness_prefix_sum,
-    population_t new_population,
-    int *fitness_to_population,
+    problem_t problem_d,
+    population_t population_d,
+    population_t new_population_d,
+    population_fitness_t fitness_h,
+    population_fitness_t fitness_d,
+    population_fitness_t fitness_prefix_sum_h,
+    population_fitness_t fitness_prefix_sum_d,
+    int *fitness_to_population_h,
+    int *fitness_to_population_d,
     bool cold_start
 ) {
     if (cold_start) {
         // Begin epoch by ranking fitness of population
         rank_individuals<<<ISLANDS, ISLAND_POP_SIZE>>>(
-            population,
-            problem,
-            fitness
+            problem_d,
+            population_d,
+            fitness_d
         );
         cudaDeviceSynchronize();
     }
     
+    cudaMemcpy(fitness_h, fitness_d, sizeof(population_fitness_t), cudaMemcpyDeviceToHost);
     // Perform a sort of the fitness values to implement the elitism strategy
     for (int i = 0; i < POP_SIZE; ++i) {
-         fitness_to_population[i] = i;
+         fitness_to_population_h[i] = i;
     }
     for (int j = 0; j < ISLANDS; j++) {
          thrust::sort_by_key(
              thrust::host,
-             fitness + j * ISLAND_POP_SIZE,
-             fitness + (j + 1) * ISLAND_POP_SIZE,
-             fitness_to_population + j * ISLAND_POP_SIZE
+             fitness_h + j * ISLAND_POP_SIZE,
+             fitness_h + (j + 1) * ISLAND_POP_SIZE,
+             fitness_to_population_h + j * ISLAND_POP_SIZE
          );
     }
-
+    
     // Perform a prefix sum of the fitness in order to easily perform roulette wheel selection of a suitable parent
     for (int j = 0; j < ISLANDS; j++) {
         thrust::inclusive_scan(
             thrust::host,
-            fitness + j * ISLAND_POP_SIZE,
-            fitness + (j + 1) * ISLAND_POP_SIZE,
-            fitness_prefix_sum + j * ISLAND_POP_SIZE
+            fitness_h + j * ISLAND_POP_SIZE,
+            fitness_h + (j + 1) * ISLAND_POP_SIZE,
+            fitness_prefix_sum_h + j * ISLAND_POP_SIZE
         );
     }
+    cudaMemcpy(fitness_d, fitness_h, sizeof(population_fitness_t), cudaMemcpyHostToDevice);
+    cudaMemcpy(fitness_prefix_sum_d, fitness_prefix_sum_h, sizeof(population_fitness_t), cudaMemcpyHostToDevice);
+    cudaMemcpy(fitness_to_population_d, fitness_to_population_h, sizeof(population_fitness_t), cudaMemcpyHostToDevice);
     
     // Perform crossover on the islands
     crossover_individuals<<<ISLANDS, ISLAND_POP_SIZE>>>(
-        problem,
-        population,
-        fitness,
-        fitness_prefix_sum,
-        new_population,
-        fitness_to_population
+        problem_d,
+        population_d,
+        fitness_d,
+        fitness_prefix_sum_d,
+        new_population_d,
+        fitness_to_population_d
     );
     cudaDeviceSynchronize();
 }
@@ -228,22 +236,29 @@ void solve(
 int main (void) {
 
     //arrays needed for problem
-    individual_t *population, *new_population; // population_t
-    float (*problem)[PROB_SIZE]; // problem_t
-    float *fitness, *fitness_prefix_sum; // population_fitness_t
-    int *fitness_to_population;
+    individual_t *population_d, *new_population; // population_t
+    float (*problem_d)[PROB_SIZE]; // problem_t
+    float *fitness_d; // population_fitness_t
+    float *fitness_prefix_sum_d; // population_fitness_t
+    int *fitness_to_population_d;
 
     // random device
     random_device rd;
     mt19937 gen = mt19937(rd());
 
-    //Unified memory (accessible from CPU and GPU)
-    cudaMallocManaged(&problem, sizeof(problem_t));
-    cudaMallocManaged(&population, sizeof(population_t));
-    cudaMallocManaged(&new_population, sizeof(population_t));
-    cudaMallocManaged(&fitness, sizeof(population_fitness_t));
-    cudaMallocManaged(&fitness_prefix_sum, sizeof(population_fitness_t));
-    cudaMallocManaged(&fitness_to_population, POP_SIZE * sizeof(int));
+    float (* const problem_h)[PROB_SIZE] = (float (*)[PROB_SIZE])malloc(sizeof(problem_t));
+    cudaMalloc(&problem_d, sizeof(problem_t));
+
+    individual_t * const population_h = (individual_t *)malloc(sizeof(population_t));
+    cudaMalloc(&population_d, sizeof(population_t));
+    cudaMalloc(&new_population, sizeof(population_t));
+
+    float * const fitness_h = (float *)malloc(sizeof(population_fitness_t));
+    float * const fitness_prefix_sum_h = (float *)malloc(sizeof(population_fitness_t));
+    int * const fitness_to_population_h = (int *)malloc(POP_SIZE * sizeof(*fitness_to_population_h));
+    cudaMalloc(&fitness_d, sizeof(population_fitness_t));
+    cudaMalloc(&fitness_prefix_sum_d, sizeof(population_fitness_t));
+    cudaMalloc(&fitness_to_population_d, POP_SIZE * sizeof(*fitness_to_population_d));
 
     //initialize sequence of matrix indices to be used for initializing the population
     vector<int> tmp_indices(PROB_SIZE);
@@ -275,20 +290,22 @@ int main (void) {
     // Calculate distance matrix
     for (int i = 0; i < PROB_SIZE; i++) {
         for (int j = 0; j < PROB_SIZE; j++) {
-            problem[i][j] = sqrt(
+            problem_h[i][j] = sqrt(
                 (problem_x[j] - problem_x[i]) * (problem_x[j] - problem_x[i]) +
                 (problem_y[j] - problem_y[i]) * (problem_y[j] - problem_y[i])
             );
         }
     }
+    cudaMemcpy(problem_d, problem_h, sizeof(problem_t), cudaMemcpyHostToDevice);
 
     // Randomly initialize population
     for (int i = 0; i < POP_SIZE; ++i) {
         shuffle(tmp_indices.begin(), tmp_indices.end(), gen);
         for (int j = 0; j < PROB_SIZE; ++j) {
-                population[i][j] = tmp_indices[j];
+                population_h[i][j] = tmp_indices[j];
         }
     }
+    cudaMemcpy(population_d, population_h, sizeof(population_t), cudaMemcpyHostToDevice);
 
     #ifdef DEBUG
         cout << "debug on" << endl;
@@ -298,12 +315,15 @@ int main (void) {
     bool cold_start = true;
     for (int epoch = 0; epoch < EPOCHS; epoch++) {
         solve(
-            population,
-            problem,
-            fitness,
-            fitness_prefix_sum,
+            problem_d,
+            population_d,
             new_population,
-            fitness_to_population,
+            fitness_h,
+            fitness_d,
+            fitness_prefix_sum_h,
+            fitness_prefix_sum_d,
+            fitness_to_population_h,
+            fitness_to_population_d,
             cold_start
         );
         cold_start = false;
@@ -318,16 +338,18 @@ int main (void) {
         // }
         if (epoch % EPOCHS_REPORT_INTERVAL == 0) {
             cudaDeviceSynchronize();
-            cout << sqrt(sqrt(1 / *thrust::max_element(fitness, fitness + POP_SIZE))) << endl;
+            cudaMemcpy(fitness_h, fitness_d, sizeof(population_fitness_t), cudaMemcpyDeviceToHost);
+            cout << sqrt(sqrt(1 / *thrust::max_element(fitness_h, fitness_h + POP_SIZE))) << endl;
         }
 
         // Verify integrity of individuals
         #ifdef DEBUG
         {
+            cudaMemcpy(population_h, population_d, sizeof(population_t), cudaMemcpyDeviceToHost)
             const int PROB_MASK_NUM_WORDS = (PROB_SIZE + 31) / 32;
             uint32_t prob_mask[PROB_MASK_NUM_WORDS];
             for (int i = 0; i < POP_SIZE; i++) {
-                individual_t &ind = population[i];
+                individual_t &ind = population_h[i];
                 for (int j = 0; j < PROB_MASK_NUM_WORDS; j++) {
                     prob_mask[j] = 0;
                 }
@@ -342,12 +364,18 @@ int main (void) {
         #endif
     }
 
-    cudaFree(problem);
-    cudaFree(population);
+    cudaFree(problem_d);
+    cudaFree(population_d);
     cudaFree(new_population);
-    cudaFree(fitness);
-    cudaFree(fitness_prefix_sum);
-    cudaFree(fitness_to_population);
-    
+    cudaFree(fitness_d);
+    cudaFree(fitness_prefix_sum_d);
+    cudaFree(fitness_to_population_d);
+
+    free(problem_h);
+    free(population_h);
+    free(fitness_h);
+    free(fitness_prefix_sum_h);
+    free(fitness_to_population_h);
+
     return 0;
 }
