@@ -157,11 +157,17 @@ if __name__ == "__main__":
     if args.dark:
         from PIL import Image
         import PIL.ImageOps
+        from tqdm import tqdm
 
-        for image_file in os.listdir(args.dir):
+        for image_file in tqdm(os.listdir(args.dir)):
             if ".png" in image_file:
                 name, _ = image_file.split(".")
-                image = Image.open(image_file)
+
+                # Skip already processed
+                if name.endswith("_inv1") or name.endswith("_inv2"):
+                    continue
+
+                image = Image.open(os.path.join(args.dir, image_file))
                 if image.mode == 'RGBA':
                     r, g, b, a = image.split()
                     rgb_image = Image.merge('RGB', (r, g, b))
@@ -171,15 +177,15 @@ if __name__ == "__main__":
                     r2, g2, b2 = inverted_image.split()
 
                     final_transparent_image = Image.merge('RGBA', (r2, g2, b2, a))
-                    final_transparent_image.save(f'{name}_inv1.png')
+                    final_transparent_image.save(os.path.join(args.dir, f'{name}_inv1.png'))
                     final_transparent_image = Image.merge('RGBA', (b2, g2, r2, a))
-                    final_transparent_image.save(f'{name}_inv2.png')
+                    final_transparent_image.save(os.path.join(args.dir, f'{name}_inv2.png'))
                 else:
                     inverted_image = PIL.ImageOps.invert(image)
-                    inverted_image.save(f'{name}_inv1.png')
+                    inverted_image.save(os.path.join(args.dir, f'{name}_inv1.png'))
                     r, g, b = inverted_image.split()
                     inverted_image = Image.merge('RGB', (r, g, b))
-                    inverted_image.save(f'{name}_inv2.png')
+                    inverted_image.save(os.path.join(args.dir, f'{name}_inv2.png'))
 
     elif args.extract:
         print("Creating dataframe... ", end="", flush=True)
