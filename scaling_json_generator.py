@@ -2,20 +2,17 @@ import json
 import math
 
 # in minutes
-estimated_runtime = 2
-repetitions = 5
+estimated_runtime = 5
+repetitions = 30
 
 # Result of grid search
 best_population = {
-    "a280": 768,
-    "d1291": 64
+    "u2319": 256
 }
 base_n = 4
-nr_islands = [1, 2, 4, 8, 12, 16, 24, 32]
-population_sizes = [lambda islands, data: int(best_population[data]),
-                    lambda islands, data: int(best_population[data] / (islands / base_n) ** 0.5),
-                    lambda islands, data: int(best_population[data] / (islands / base_n))]
-population_size_names = ["fixed", "sqrt", "scaled"]
+nr_islands = [1, 2, 4, 8, 12, 16, 24, 32, 48, 64]
+population_sizes = [lambda islands, data: max(islands, int(best_population[data] / (islands / base_n)))]
+population_size_names = ["scaled"]
 
 migration_period = 25
 migration_amount = lambda x: x // 8
@@ -23,8 +20,7 @@ elite_size = lambda x: x // 2
 log_freq = lambda x: x // 1000
 
 base_times = {
-    "a280": 4.491,
-    "d1291": 16.946
+    "u2319": 78.710
 }
 
 base_population = 64
