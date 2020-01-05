@@ -1,0 +1,98 @@
+{
+  "name": "scaling test a280",
+  "repetitions": 5,
+  "fixed_params": {
+    "--data": "a280.csv",
+    "--mutation": 10,
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "truncation",
+    "--replacement_policy": "truncation",
+    "mode": "sequential",
+    "-n": 1
+  },
+  "variable_params": {
+    "pop": {
+      "type": "tuple",
+      "names": [
+        "--population",
+        "--elite_size",
+        "--epochs",
+        "--log_freq"
+      ],
+      "values": [
+        {
+          "value": [
+            2,
+            1,
+            42750000,
+            42750
+          ]
+        },
+        {
+          "value": [
+            4,
+            2,
+            21380000,
+            21380
+          ]
+        },
+        {
+          "value": [
+            8,
+            4,
+            10690000,
+            10690
+          ]
+        },
+        {
+          "value": [
+            16,
+            8,
+            5340000,
+            5340
+          ]
+        },
+        {
+          "value": [
+            32,
+            16,
+            2670000,
+            2670
+          ]
+        },
+        {
+          "value": [
+            64,
+            32,
+            1340000,
+            1340
+          ]
+        },
+        {
+          "value": [
+            128,
+            64,
+            670000,
+            670
+          ]
+        },
+        {
+          "value": [
+            256,
+            128,
+            330000,
+            330
+          ]
+        },
+        {
+          "value": [
+            512,
+            256,
+            170000,
+            170
+          ]
+        }
+      ]
+    }
+  }
+}
