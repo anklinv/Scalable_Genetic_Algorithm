@@ -7,7 +7,7 @@ from ortools.constraint_solver import pywrapcp
 
 def create_data_model(data):
     """Stores the data for the problem."""
-    with open("../data/{}.csv".format(data)) as file:
+    with open("../../data/{}.csv".format(data)) as file:
         n_cities = file.readline()
         distances = file.readlines()
         distance_matrix = list(map(lambda x: list(map(int, x.split(";")[0:-1])), distances))
@@ -20,18 +20,7 @@ def create_data_model(data):
 
 def print_solution(manager, routing, assignment):
     """Prints assignment on console."""
-    print('Objective: {} miles'.format(assignment.ObjectiveValue()))
-    index = routing.Start(0)
-    plan_output = 'Route for vehicle 0:\n'
-    route_distance = 0
-    while not routing.IsEnd(index):
-        plan_output += ' {} ->'.format(manager.IndexToNode(index))
-        previous_index = index
-        index = assignment.Value(routing.NextVar(index))
-        route_distance += routing.GetArcCostForVehicle(previous_index, index, 0)
-    plan_output += ' {}\n'.format(manager.IndexToNode(index))
-    print(plan_output)
-    plan_output += 'Route distance: {}miles\n'.format(route_distance)
+    print('Path length achieved: {}'.format(assignment.ObjectiveValue()))
 
 
 def solve_tsp(data):
