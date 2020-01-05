@@ -1,10 +1,10 @@
 import json
 import math
 
-repetitions = 5
+repetitions = 10
 
 base_n = 4
-populations = [2, 4, 8, 16, 32, 64, 128, 256, 512]
+populations = [2, 3, 4, 6, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
 
 elite_size = lambda x: x // 2
 log_freq = lambda x: x // 1000
@@ -25,9 +25,11 @@ target_runtimes = {
 base_population = 64
 base_epochs = 100000
 
+total_runtime = 0
+
 for data in base_times.keys():
     experiment = dict()
-    experiment["name"] = f"scaling test {data}"
+    experiment["name"] = f"population test {data}"
     experiment["repetitions"] = repetitions
     fixed_params = dict()
     fixed_params["--data"] = data + ".csv"
@@ -62,4 +64,8 @@ for data in base_times.keys():
     with open(f"population_test_{data}_.json", mode="w") as file:
         json.dump(experiment, file, indent=2)
 
-    print(f"Estimated run time for {data}: {estimated_runtime * len(populations) * repetitions / 60} h per problem")
+    data_runtime = estimated_runtime * len(populations) * repetitions / 60
+    print(f"Estimated run time for {data}: {data_runtime} h per problem")
+    total_runtime += data_runtime
+
+print(f"Estimated total time: {total_runtime} h per problem")
