@@ -7,7 +7,7 @@ base_n = 4
 populations = [2, 3, 4, 6, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
 
 elite_size = lambda x: x // 2
-log_freq = lambda x: x // 1000
+log_freq = lambda x: max(1, x // 1000)
 
 base_times = {
     "a280": 4.491,
@@ -48,7 +48,7 @@ for data in base_times.keys():
     estimated_runtime = target_runtimes[data]
     for population in populations:
         multiplier = base_population / population
-        epochs = int(round((estimated_runtime * 60 / base_times[data]) * base_epochs * multiplier, -4))
+        epochs = int(round((estimated_runtime * 60 / base_times[data]) * base_epochs * multiplier, 0))
         val = [
             population,
             elite_size(population),

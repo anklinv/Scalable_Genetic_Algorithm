@@ -57,7 +57,7 @@ for data in base_times.keys():
     pop["values"] = values
     variable_params["pop"] = pop
     experiment["variable_params"] = variable_params
-    with open(f"population_test__remaining_{data}.json", mode="w") as file:
+    with open(f"population_test_remaining_{data}.json", mode="w") as file:
         json.dump(experiment, file, indent=2)
 
     data_runtime = estimated_runtime * len(populations) * repetitions / 60
