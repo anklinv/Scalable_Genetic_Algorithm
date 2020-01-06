@@ -1,0 +1,134 @@
+{
+  "name": "scaling test u2319",
+  "repetitions": 30,
+  "fixed_params": {
+    "--data": "u2319.csv",
+    "--mutation": 10,
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "truncation",
+    "--replacement_policy": "truncation",
+    "--migration_period": 25
+  },
+  "variable_params": {
+    "pop": {
+      "type": "tuple",
+      "names": [
+        "--population",
+        "--elite_size",
+        "-n",
+        "--epochs",
+        "--log_freq",
+        "--migration_amount"
+      ],
+      "values": [
+        {
+          "value": [
+            128,
+            64,
+            1,
+            152458,
+            152,
+            16
+          ]
+        },
+        {
+          "value": [
+            64,
+            32,
+            2,
+            304917,
+            304,
+            8
+          ]
+        },
+        {
+          "value": [
+            32,
+            16,
+            4,
+            609834,
+            609,
+            4
+          ]
+        },
+        {
+          "value": [
+            16,
+            8,
+            8,
+            1219667,
+            1219,
+            2
+          ]
+        },
+        {
+          "value": [
+            12,
+            6,
+            12,
+            1626223,
+            1626,
+            1
+          ]
+        },
+        {
+          "value": [
+            16,
+            8,
+            16,
+            1219667,
+            1219,
+            2
+          ]
+        },
+        {
+          "value": [
+            24,
+            12,
+            24,
+            813111,
+            813,
+            3
+          ]
+        },
+        {
+          "value": [
+            32,
+            16,
+            32,
+            609834,
+            609,
+            4
+          ]
+        },
+        {
+          "value": [
+            48,
+            24,
+            48,
+            406556,
+            406,
+            6
+          ]
+        },
+        {
+          "value": [
+            64,
+            32,
+            64,
+            304917,
+            304,
+            8
+          ]
+        }
+      ]
+    },
+    "mode": {
+      "type": "list",
+      "list": [
+        "island",
+        "naive"
+      ]
+    }
+  }
+}
