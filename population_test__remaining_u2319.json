@@ -1,0 +1,58 @@
+{
+  "name": "population test u2319",
+  "repetitions": 10,
+  "fixed_params": {
+    "--data": "u2319.csv",
+    "--mutation": 10,
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "truncation",
+    "--replacement_policy": "truncation",
+    "mode": "sequential",
+    "-n": 1
+  },
+  "variable_params": {
+    "pop": {
+      "type": "tuple",
+      "names": [
+        "--population",
+        "--elite_size",
+        "--epochs",
+        "--log_freq"
+      ],
+      "values": [
+        {
+          "value": [
+            2048,
+            1024,
+            7146,
+            7
+          ]
+        },
+        {
+          "value": [
+            4096,
+            2048,
+            3573,
+            3
+          ]
+        },
+        {
+          "value": [
+            8192,
+            4096,
+            1787,
+            1
+          ]
+        },
+        {
+          "value": [
+            16384,
+            8192,
+            893,
+            1
+          ]
+        }
+      ]
+    }
+  }
+}
