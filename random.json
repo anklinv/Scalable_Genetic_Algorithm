@@ -1,0 +1,20 @@
+{
+  "name" : "Truncation Experiment",
+  "repetitions" : 5,
+  "fixed_params" : {
+    "-n" : 8,
+    "mode": "island",
+    "--population": 756,
+    "--elite_size": 384,
+    "--mutation": 10,
+    "--epochs": 1000000,
+    "--data": "d1291.csv",
+    "--migration_topology": "fully_connected",
+    "--selection_policy": "pure_random",
+    "--replacement_policy": "pure_random",
+    "--migration_period": 20,
+    "--migragion_amount": 150,
+    "--underlying_communication": "blocking"
+  },
+  "variable_params" : {}
+}

@@ -1,0 +1,26 @@
+{
+  "name" : "Fully Connected Experiment",
+  "repetitions" : 5,
+  "fixed_params" : {
+    "-n" : 8,
+    "mode": "island",
+    "--population": 756,
+    "--elite_size": 384,
+    "--mutation": 10,
+    "--epochs": 1000000,
+    "--data": "d1291.csv",
+    "--migration_topology": "ring",
+    "--selection_policy": "truncation",
+    "--replacement_policy": "truncation",
+    "--migration_period": 20,
+    "--migragion_amount": 384
+  },
+  "variable_params" : {
+    "--underlying_communication": {
+        "type": "list",
+        "list": [
+	    "blocking", "non_blocking", "rma"
+        ]
+    }
+  }
+}
