@@ -142,6 +142,23 @@ TravellingSalesmanProblem::TravellingSalesmanProblem(const int problem_size, flo
         }
     }
     
+    // small code snippet to determine the name of the CPU
+    string line;
+    ifstream dataFile("/proc/cpuinfo");
+    int count = 0;
+    if(dataFile.is_open()) {
+        while(getline(dataFile, line)) {
+            cout << line << endl;
+        count++;
+        if(count == 5) {
+        break;
+        }
+        }
+    } else {
+        cout << "unable to open file" << endl;
+    }
+    // end CPU name
+    
     long sizeWorkingSet = sizeof(int) * population_count; // rank vector
     //sizeWorkingSet += sizeof(float) * problem_size * problem_size; // cities matrix
     sizeWorkingSet += sizeof(Int) * problem_size * population_count; // population matrix
