@@ -651,8 +651,8 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
         /*int mask[problem_size]; // size of a single individual
         for(int idx = 0; idx < problem_size; idx++) {
             mask[idx] = 1;
-        }
-        // cities are indexed 0, ..., (problem_size-1)*/
+        }*/
+        // cities are indexed 0, ..., (problem_size-1)
         // TODO: end sequential version
             
         // TODO: start SIMD version
@@ -687,7 +687,7 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
         // TODO: end sequential version
             
         // TODO: start SIMD version
-        if(sizeof(Int) == 4) {
+        /*if(sizeof(Int) == 4) {
             
             const int ALL_BITS_ZERO = 0x00000000;
             
@@ -785,7 +785,7 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
                 child[geneIdx] = geneSeg;
                 mask[geneSeg] = ALL_BITS_ZERO;
             }
-        }
+        }*/
         // TODO: end SIMD version
             
             /*int sum = 0;
@@ -1022,7 +1022,7 @@ void TravellingSalesmanProblem::breed_population() {
     int deltaIntermediate;
 #endif*/
     
-    if(sizeof(Int) == 4) { // 32-bit version
+    /*if(sizeof(Int) == 4) { // 32-bit version
         // TODO: start SIMD version
         __m256i geneSegSIMD;
         int popIdx = 0;
@@ -1054,10 +1054,10 @@ void TravellingSalesmanProblem::breed_population() {
             }
         }
         // TODO: end SIMD version
-    }
+    }*/
 
     // TODO: start scalar version
-    /*// Keep the best individuals
+    // Keep the best individuals
     for (int i = 0; i < this->elite_size; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             //temp_population[i][j] = POP(this->ranks[i], j);
@@ -1067,7 +1067,7 @@ void TravellingSalesmanProblem::breed_population() {
             // end SIMD version
             //population[i][j] = POP(this->ranks[i], j);
         }
-    }*/
+    }
     // TODO: end scalar version
     
 /*#ifdef microbenchmark_breed
@@ -1079,7 +1079,7 @@ void TravellingSalesmanProblem::breed_population() {
 #endif*/
     
     // TODO: start SIMD version
-    __m256 fitnessWeightsSIMD;
+    /*__m256 fitnessWeightsSIMD;
     
     const __m256 ONES_SIMD = _mm256_set1_ps(Real(1.0));
     Real fitnessConstant = Real(1) / fitness_sum;
@@ -1103,12 +1103,12 @@ void TravellingSalesmanProblem::breed_population() {
         fitnessWeights[indivIdx] = pow(fitnessWeights[indivIdx], 4);
         fitnessWeights[indivIdx] = 1.0 / fitnessWeights[indivIdx];
     }
-    auto dist = std::discrete_distribution<>(fitnessWeights, fitnessWeights + population_count);
+    auto dist = std::discrete_distribution<>(fitnessWeights, fitnessWeights + population_count);*/
     // TODO: end SIMD version
     
     
     // TODO: start scalar version
-    /*vector<double> correct_fitness(this->population_count);
+    vector<double> correct_fitness(this->population_count);
     //double fc = 1.0 / this->fitness_sum;
     for (int i = 0; i < this->population_count; ++i) {
         correct_fitness[i] = 1 / pow(this->fitness[i] / this->fitness_sum, 4);
@@ -1117,7 +1117,7 @@ void TravellingSalesmanProblem::breed_population() {
         //assert(abs(tmp - fitnessWeights[i]) / tmp < 1e-5);
     }
     
-    auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());*/
+    auto dist = std::discrete_distribution<>(correct_fitness.begin(), correct_fitness.end());
     // TODO: end scalar version
 
 /*#ifdef microbenchmark_breed
@@ -1158,7 +1158,7 @@ void TravellingSalesmanProblem::breed_population() {
     tStart = myClock.now();
 #endif*/
     
-    if(sizeof(Int) == 4) { // 32-bit version
+    /*if(sizeof(Int) == 4) { // 32-bit version
         // TODO: start SIMD version
         __m256i geneSegSIMD;
         int popIdx = 0;
@@ -1188,16 +1188,16 @@ void TravellingSalesmanProblem::breed_population() {
             }
         }
         // TODO: end SIMD version
-    }
+    }*/
     
     // TODO: start scalar version
-    /*for (int i = 0; i < this->population_count; ++i) {
+    for (int i = 0; i < this->population_count; ++i) {
         for (int j = 0; j < this->problem_size; ++j) {
             VAL_POP(i, j);
             //assert(POP(i, j) == temp_population[i*problem_size + j]);
             POP(i, j) = temp_population[i*problem_size + j];
         }
-    }*/
+    }
     // TODO: end scalar version
     
 /*#ifdef microbenchmark_breed

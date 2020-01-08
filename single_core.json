@@ -1,0 +1,21 @@
+{
+  "name" : "single core optimization",
+  "repetitions" : 1,
+  "fixed_params" : {
+    "-n" : 1,
+    "mode": "sequential",
+    "--population": 60,
+    "--elite_size": 30,
+    "--mutation": 10,
+    "--epochs": 10000,
+    "--data": "a280.csv"
+  },
+  "variable_params" : {
+    "--migration_period": {
+        "type": "list",
+        "list": [
+            1
+        ]
+    }
+  }
+}
