@@ -7,11 +7,12 @@ set(CMAKE_CXX_STANDARD 17)
 
 cmake_minimum_required(VERSION 3.15)
 
-SET(CMAKE_CXX_FLAGS  "-mavx2 -O3 -funroll-loops")
+SET(CMAKE_CXX_FLAGS  "")
 
-add_definitions(-D Int=int -D Real=float)
+add_definitions(-mavx2 -O3 -funroll-loops -D Int=int -D Real=float -D microbenchmark_breed)
 #[[ currently only Real={float} and Int={uint16_t, uint32_t, int} are supported ]]
 #[[ -D microbenchmark_breed  for microbenchmarks ]]
 #[[ -mbmi2 for bit manipulation ]]
+#[[ -mavx2 -O3 -funroll-loops for optimizations ]]
 
 add_executable(Distributed_Genetic_Algorithm main.cpp logging/logging.cpp sequential/travelling_salesman_problem.cpp island/island.cpp)

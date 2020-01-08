@@ -14,6 +14,8 @@ using namespace std;
  */
 
 typedef std::vector<int> vi;
+typedef std::vector<long> vl;
+typedef std::vector<double> vd;
 
 typedef std::chrono::high_resolution_clock hrClock;
 typedef std::chrono::time_point<hrClock> hrTime;
