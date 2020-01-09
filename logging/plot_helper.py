@@ -198,7 +198,7 @@ def calculate_lengths_achieved(df, thresholds):
         to_keep.remove("wall clock time")
         if "epoch" in df:
             to_keep.remove("epoch")
-        tmp_df = df[df["wall clock time"] >= threshold].groupby(["rep", "population", "elite_size", "migration_amount", "epochs", "log_freq", "mode", "n"]).agg({"fitness": "max"})
+        tmp_df = df[df["wall clock time"] >= threshold].groupby(to_keep).agg({"fitness": "max"})
         tmp_df["wall clock time"] = threshold
         tmp_df = tmp_df.reset_index()
 
@@ -316,6 +316,27 @@ def create_scaling_speedup_plot(df, problem, xticks_n, scaling_thresholds=None, 
         plt.legend(legend)
         ax.set_title(f"speedup island model vs naive model (threshold {threshold})")
         fig.savefig(f"speedup_{problem}_{threshold}.pdf")
+
+
+'''
+Create a population scaling barplot from dataframe with predefined wall clock time thresholds
+'''
+def create_population_barplot(line_df, problem, thresholds, palette="plasma"):
+
+    threshold_list = [thresholds[i] for i in [len(thresholds) // 50, len(thresholds) // 10, len(thresholds) // 2, -1]]
+
+    for threshold in tqdm(threshold_list):
+        fig, ax = plt.subplots()
+        sns.barplot(ax=ax, y="fitness", x="population", data=line_df[line_df["wall clock time"] == threshold], palette=palette)
+
+        # Turn thresholds into seconds
+        threshold_name = int(np.round(threshold / 1000, 0))
+
+        # Make sure axis labels fit
+        plt.setp(ax.get_xticklabels(), rotation=45, horizontalalignment='right')
+
+        ax.set_title(f"{problem} population comparison after {threshold_name}s")
+        fig.savefig(f"population_scaling_{problem}_{threshold_name}s.pdf")
 
 
 if __name__ == "__main__":
