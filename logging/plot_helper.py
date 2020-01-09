@@ -256,7 +256,7 @@ def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylo
 
         ax.get_yaxis().set_label_text("length")
         ax.get_xaxis().set_label_text("wall clock time [s]")
-        fig.savefig(f"scaling_{mode}_{problem}_{zoom_level}.svg")
+        fig.savefig(f"scaling_{mode}_{problem}_{zoom_level}.pdf")
 
 
 '''
@@ -315,7 +315,7 @@ def create_scaling_speedup_plot(df, problem, xticks_n, scaling_thresholds=None, 
             ax.yaxis.set_minor_locator(plt.MultipleLocator(1))
         plt.legend(legend)
         ax.set_title(f"speedup island model vs naive model (threshold {threshold})")
-        fig.savefig(f"speedup_{problem}_{threshold}.svg")
+        fig.savefig(f"speedup_{problem}_{threshold}.pdf")
 
 
 if __name__ == "__main__":
