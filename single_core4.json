@@ -14,7 +14,7 @@
     "--migration_period": {
         "type": "list",
         "list": [
-            1
+            4
         ]
     }
   }

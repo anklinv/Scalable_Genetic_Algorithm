@@ -394,7 +394,7 @@ void TravellingSalesmanProblem::rank_individuals() {
 #endif*/
     
     // TODO: begin scalar version
-    /*this->fitness_sum = 0.0;
+    this->fitness_sum = 0.0;
     this->fitness_best = MAX_REAL;
     
     // min over range can be done efficiently using SIMD
@@ -406,20 +406,20 @@ void TravellingSalesmanProblem::rank_individuals() {
         this->fitness[i] = new_fitness;
         this->fitness_sum += new_fitness;
         this->fitness_best = min((double)this->fitness_best, (double)new_fitness);
-    }*/
+    }
     // TODO: end scalar version
     
     // TODO: begin SIMD version
-    for(int indivIdx = 0; indivIdx < population_count; indivIdx++) {
+    /*for(int indivIdx = 0; indivIdx < population_count; indivIdx++) {
         fitness[indivIdx] = evaluate_fitness(indivIdx);
     }
     
-/*#ifdef microbenchmark_breed
+#ifdef microbenchmark_breed
     tEnd = myClock.now();
     delta = std::chrono::duration_cast<hrNanos>(tEnd - tStart).count();
     evaluateRuntimes.push_back(delta);
     tStart = myClock.now();
-#endif*/
+#endif
     
     Real sumFitness = 0.0; // results to compute
     Real minFitness = MAX_REAL;
@@ -472,7 +472,7 @@ void TravellingSalesmanProblem::rank_individuals() {
     //assertm(abs(minFitness - this->fitness_best) < 1e-5, "fitness min incorrect");
         
     this->fitness_best = minFitness;
-    this->fitness_sum = sumFitness;
+    this->fitness_sum = sumFitness;*/
     // TODO: end SIMD version
         
 /*#ifdef microbenchmark_breed
@@ -508,7 +508,7 @@ void TravellingSalesmanProblem::rank_individuals() {
 
 Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     
-    if(sizeof(Int) == 4) { // 32-bit version
+    /*if(sizeof(Int) == 4) { // 32-bit version
         // TODO: begin SIMD version
         // compute how many mask elements are covered by a __m256i
         const int INC_GENE = (256 / 8) / sizeof(Int); // bytes
@@ -592,10 +592,10 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
         // TODO: start SIMD version
 
         // TODO: end SIMD version
-    }
+    }*/
     
     // TODO: start sequential version
-    /*Real route_distance = 0.0;
+    Real route_distance = 0.0;
     
     for (int j = 0; j < this->problem_size - 1; ++j) {
         VAL_POP(individual, j);
@@ -612,7 +612,7 @@ Real TravellingSalesmanProblem::evaluate_fitness(const int individual) {
     
     //assertm(sumDistances == route_distance, "computed distance is not correct");
     
-    return route_distance;*/
+    return route_distance;
     // TODO: end sequential version
 }
 
@@ -648,15 +648,15 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
         // experiment with mask
             
         // TODO: start sequential version
-        /*int mask[problem_size]; // size of a single individual
+        int mask[problem_size]; // size of a single individual
         for(int idx = 0; idx < problem_size; idx++) {
             mask[idx] = 1;
-        }*/
+        }
         // cities are indexed 0, ..., (problem_size-1)
         // TODO: end sequential version
             
         // TODO: start SIMD version
-        // compute how many mask elements are covered by a __m256i
+        /*// compute how many mask elements are covered by a __m256i
         const int INC_MASK = (256 / 8) / sizeof(Int); // bytes
         
         const __m256i ALL_BITS_SET_SIMD = _mm256_set1_epi32(0xFFFFFFFF);
@@ -672,18 +672,18 @@ void TravellingSalesmanProblem::breed(const int parent1, const int parent2, Int*
         
         for(; maskIdx < problem_size; maskIdx++) {
             mask[maskIdx] = ALL_BITS_SET;
-        }
+        }*/
         // TODO: end SIMD version
             
         // TODO: start sequential version
-        /*for (int i = startGene; i <= endGene; ++i) {
+        for (int i = startGene; i <= endGene; ++i) {
             // when running this version it is super important to use the
             // local mask array
             child[i] = POP(parent1, i);
             //assertm(0 <= POP(parent1, i) && POP(parent1, i) <= problem_size-1, "segfault mask, loop chunk");
             //assertm(mask[POP(parent1, i)] == 0xFFFFFFFF, "gene part is already masked, loop chunk");
             mask[POP(parent1, i)] = 0x00000000;
-        }*/
+        }
         // TODO: end sequential version
             
         // TODO: start SIMD version

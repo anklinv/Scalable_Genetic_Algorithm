@@ -4,17 +4,17 @@
   "fixed_params" : {
     "-n" : 1,
     "mode": "sequential",
-    "--population": 60,
-    "--elite_size": 30,
+    "--population": 6000,
+    "--elite_size": 3000,
     "--mutation": 10,
-    "--epochs": 10000,
+    "--epochs": 100,
     "--data": "a280.csv"
   },
   "variable_params" : {
     "--migration_period": {
         "type": "list",
         "list": [
-            1
+            16
         ]
     }
   }

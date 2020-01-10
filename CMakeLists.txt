@@ -11,7 +11,7 @@ SET(CMAKE_CXX_FLAGS  "-mavx2 -O3 -funroll-loops")
 #[[ -mbmi2 for bit manipulation ]]
 #[[ -mavx2 -O3 -funroll-loops for optimizations ]]
 
-add_definitions(-D Int=int -D Real=float -D microbenchmark_breed)
+add_definitions(-D Int=uint16_t -D Real=float)
 #[[ currently only Real={float} and Int={uint16_t, uint32_t, int} are supported ]]
 #[[ -D microbenchmark_breed  for microbenchmarks ]]
 
