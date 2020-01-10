@@ -213,7 +213,7 @@ def calculate_lengths_achieved(df, thresholds):
 Generate scaling lineplots for a given dataframe and problem name.
 Uses y_scaling_limits to determine the limits and legend_n to determine the legend
 '''
-def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylow=None, yhigh=None, manual_legend=True, legend_n=None, y_scaling_limits=None):
+def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylow=None, yhigh=None, manual_legend=True, legend_n=None, y_scaling_limits=None, hue="n", legend_col=1):
     assert not limits or ((ylow is not None and yhigh is not None) or y_scaling_limits is not None)
     assert not manual_legend or (legend_n is not None)
 
@@ -223,17 +223,17 @@ def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylo
     plot_df["wall clock time"] = plot_df["wall clock time"] / 1000
 
     # Fix the color map linear scaling
-    plot_df["n"] = np.log2(plot_df["n"])
+    plot_df[hue] = np.log2(plot_df[hue])
 
     for mode in line_df["mode"].unique():
         fig, ax = plt.subplots()
-        sns.lineplot(ax=ax, y="fitness", x="wall clock time", hue="n", data=plot_df[plot_df["mode"] == mode], palette=palette)
+        sns.lineplot(ax=ax, y="fitness", x="wall clock time", hue=hue, data=plot_df[plot_df["mode"] == mode], palette=palette)
         ax.set_title(f"scaling of the {mode} model")
 
         # Figure out limits
         if limits:
             if ylow is not None and yhigh is not None:
-                ax.set_ylim(ylow, ylow)
+                ax.set_ylim(ylow, yhigh)
             else:
                 low, high = y_scaling_limits[problem]
                 ax.set_ylim(low, high)
@@ -244,7 +244,7 @@ def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylo
 
         # Figure out legend
         if manual_legend:
-            all_n = list(line_df["n"].unique())
+            all_n = list(line_df[hue].unique())
             all_n.sort()
             index = [all_n.index(n) for n in legend_n]
             from matplotlib.lines import Line2D
@@ -252,7 +252,7 @@ def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylo
                 custom_lines = [Line2D([0], [0], color=plt.get_cmap(palette)(c / (len(all_n) - 1)), lw=2) for c in index]
             else:
                 custom_lines = [Line2D([0], [0], color=palette[i], lw=2) for i in index]
-            ax.legend(handles=custom_lines, title="n", loc="upper right", labels=list(map(str, legend_n)))
+            ax.legend(handles=custom_lines, title=hue, loc="upper right", labels=list(map(str, legend_n)), ncol=legend_col)
 
         ax.get_yaxis().set_label_text("length")
         ax.get_xaxis().set_label_text("wall clock time [s]")
