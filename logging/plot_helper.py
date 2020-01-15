@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
-from process_log import Tags, Log, Epochs, generate_fitness_wc_dataframe
+from process_log import Tags, Log, Epochs, generate_fitness_wc_dataframe, generate_periods_dataframe
 from tqdm.auto import tqdm
 
 
@@ -256,7 +256,7 @@ def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylo
 
         ax.get_yaxis().set_label_text("length")
         ax.get_xaxis().set_label_text("wall clock time [s]")
-        fig.savefig(f"scaling_{mode}_{problem}_{zoom_level}.pdf")
+        fig.savefig(f"scaling_{mode}_{problem}_{zoom_level}.pdf", pad_inches=0, bbox_inches="tight")
 
 
 '''
@@ -294,10 +294,10 @@ def create_scaling_speedup_plot(df, problem, xticks_n, scaling_thresholds=None, 
 
         if static_ylim:
             ylim = y_scaling_limits_speedup[problem]
-            xlim = 64
+            xlim = 65
         else:
             ylim = int(np.ceil(df_speedup["wall clock time"].max()))
-            xlim = int(df_speedup["n"].max())
+            xlim = int(df_speedup["n"].max()) + 1
 
         # Plot the speedup
         fig, ax = plt.subplots()
@@ -306,8 +306,8 @@ def create_scaling_speedup_plot(df, problem, xticks_n, scaling_thresholds=None, 
                      legend="full", err_style="bars", err_kws={"ecolor" : "k", "fmt" : "o"}, estimator=np.median, ci=95)
         plt.plot([1,ylim],[1, ylim], "--", color='#888888')
         ax.set(xlabel='n', ylabel='speedup')
-        ax.set_xlim(1, xlim)
-        ax.set_ylim(1, ylim)
+        ax.set_xlim(0, xlim)
+        ax.set_ylim(0, ylim)
         ax.xaxis.set_major_locator(plt.FixedLocator(xticks_n))
         ax.xaxis.set_minor_locator(plt.MultipleLocator(1))
         if static_ylim:
@@ -315,7 +315,7 @@ def create_scaling_speedup_plot(df, problem, xticks_n, scaling_thresholds=None, 
             ax.yaxis.set_minor_locator(plt.MultipleLocator(1))
         plt.legend(legend)
         ax.set_title(f"speedup island model vs naive model (threshold {threshold})")
-        fig.savefig(f"speedup_{problem}_{threshold}.pdf")
+        fig.savefig(f"speedup_{problem}_{threshold}.pdf", pad_inches=0, bbox_inches="tight")
 
 
 '''
@@ -336,13 +336,43 @@ def create_population_barplot(line_df, problem, thresholds, palette="plasma"):
         plt.setp(ax.get_xticklabels(), rotation=45, horizontalalignment='right')
 
         ax.set_title(f"{problem} population comparison after {threshold_name}s")
-        fig.savefig(f"population_scaling_{problem}_{threshold_name}s.pdf")
+        fig.savefig(f"population_scaling_{problem}_{threshold_name}s.pdf", pad_inches=0, bbox_inches="tight")
+
+
+'''
+Create a plot of the communication percentage for a periods dataframe
+'''
+def create_communication_boxplot(df, problem, subset_n=None):
+    assert "period" in df
+    if subset_n is not None:
+        df = df[df["n"].isin(subset_n)]
+    to_keep = list(df.columns)
+    to_keep.remove("time")
+    to_keep.remove("type")
+    summed_df = df.groupby(to_keep, as_index=False).agg({"time" : "sum"})
+    summed_df["type"] = "sum"
+    df_bar = df.copy()
+    df_bar = df_bar.append(summed_df, ignore_index=True)
+    df_sum = df_bar[df_bar["type"] == "sum"].rename(columns={"time" : "sum"}).drop(columns=["type"])
+    df_comm = df_bar[df_bar["type"] == "communication"].rename(columns={"time" : "communication"}).drop(columns=["type"])
+    df_comp = df_bar[df_bar["type"] == "computation"].rename(columns={"time" : "computation"}).drop(columns=["type"])
+    df_mix = pd.merge(df_sum, df_comm,  how='left', on=["rep", "rank", "n", "mode", "elite_size", "epochs", "log_freq", "migration_amount", "period", "population"])
+    df_mixed = pd.merge(df_mix, df_comp, how="left", on=["rep", "rank", "n", "mode", "elite_size", "epochs", "log_freq", "migration_amount", "period", "population"])
+    df_mixed["communication"] = (df_mixed["communication"] / df_mixed["sum"]) * 100
+    df_mixed["computation"] = (df_mixed["computation"] / df_mixed["sum"]) * 100
+    fig, ax = plt.subplots()
+    sns.boxplot(x="n", y="communication", data=df_mixed[df_mixed["period"] != 0], notch=True)
+    ax.set_title(f"Communication Percentages for {problem}")
+    ax.set_ylabel("communication fraction [%]")
+    fig.savefig(f"communication_boxplot_{problem}.pdf", pad_inches=0, bbox_inches="tight")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Plot GA')
     parser.add_argument('--extract', default=False, dest="extract", action="store_true",
                         help="Whether extract the data frames from the log directory")
+    parser.add_argument('--periods', default=False, dest="periods", action="store_true",
+                        help="Whether to extract the periods instead")
     parser.add_argument('--bar', default=False, dest="bar", action="store_true",
                         help="Create a bar plot instead of a line plot")
     parser.add_argument('--speedup', dest="speedup", type=str, default="",
@@ -390,11 +420,18 @@ if __name__ == "__main__":
                     inverted_image.save(os.path.join(args.dir, f'{name}_inv2.png'))
 
     elif args.extract:
-        print("Creating dataframe... ", end="", flush=True)
-        name = os.path.split(args.dir.strip("/").strip("\\"))[-1]
-        df = generate_fitness_wc_dataframe(args.dir, name)
-        print("Done!")
-        print(f"Saved to {name}.gz")
+        if args.periods:
+            print("Creating periods dataframe... ", end="", flush=True)
+            name = os.path.split(args.dir.strip("/").strip("\\"))[-1]
+            df = generate_periods_dataframe(args.dir, name)
+            print("Done!")
+            print(f"Saved to {name}.gz")
+        else:
+            print("Creating dataframe... ", end="", flush=True)
+            name = os.path.split(args.dir.strip("/").strip("\\"))[-1]
+            df = generate_fitness_wc_dataframe(args.dir, name)
+            print("Done!")
+            print(f"Saved to {name}.gz")
     else:
         print("Loading dataframe... ", end="", flush=True)
         df = pd.read_csv(args.dir)

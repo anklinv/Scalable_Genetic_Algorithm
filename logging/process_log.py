@@ -8,7 +8,7 @@ import struct
 import json
 import pandas as pd
 from collections import OrderedDict
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 
 
 class Tags(object):
