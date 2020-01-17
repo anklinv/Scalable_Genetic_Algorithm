@@ -213,7 +213,7 @@ def calculate_lengths_achieved(df, thresholds):
 Generate scaling lineplots for a given dataframe and problem name.
 Uses y_scaling_limits to determine the limits and legend_n to determine the legend
 '''
-def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylow=None, yhigh=None, manual_legend=True, legend_n=None, y_scaling_limits=None, hue="n", legend_col=1):
+def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylow=None, yhigh=None, manual_legend=True, legend_n=None, y_scaling_limits=None, hue="n", legend_col=1, figsize=(8,6)):
     assert not limits or ((ylow is not None and yhigh is not None) or y_scaling_limits is not None)
     assert not manual_legend or (legend_n is not None)
 
@@ -226,9 +226,9 @@ def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylo
     plot_df[hue] = np.log2(plot_df[hue])
 
     for mode in line_df["mode"].unique():
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=figsize)
         sns.lineplot(ax=ax, y="fitness", x="wall clock time", hue=hue, data=plot_df[plot_df["mode"] == mode], palette=palette)
-        ax.set_title(f"scaling of the {mode} model")
+        #ax.set_title(f"scaling of the {mode} model")
 
         # Figure out limits
         if limits:
@@ -260,10 +260,53 @@ def create_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylo
 
 
 '''
+Generate compact scaling lineplots for a given dataframe and problem name.
+Uses y_scaling_limits to determine the limits and legend_n to determine the legend
+'''
+def create_compact_scaling_lineplot(line_df, problem, palette="plasma", limits=True, ylow=None, yhigh=None, manual_legend=True, legend_n=None, y_scaling_limits=None, hue="n", legend_col=1, xhigh=100):
+    assert not limits or ((ylow is not None and yhigh is not None) or y_scaling_limits is not None)
+    assert not manual_legend or (legend_n is not None)
+
+    plot_df = line_df.copy()
+
+    # Turn wall clock time into seconds
+    plot_df["wall clock time"] = plot_df["wall clock time"] / 1000
+
+    # Fix the color map linear scaling
+    plot_df[hue] = np.log2(plot_df[hue])
+
+    low, high = y_scaling_limits[problem]
+
+    ax = sns.FacetGrid(plot_df, col="mode", hue=hue, palette=palette, legend_out=True, aspect=1.5, height=5,
+                       ylim=(low, high), xlim=(0, xhigh), despine=False)
+    plt.rc_context({'lines.linewidth': 1})
+    ax = ax.map(sns.lineplot, "wall clock time", "fitness")
+
+    if manual_legend:
+        all_n = list(line_df[hue].unique())
+        all_n.sort()
+        index = [all_n.index(n) for n in legend_n]
+        from matplotlib.lines import Line2D
+        if isinstance(palette, str):
+            custom_lines = [Line2D([0], [0], color=plt.get_cmap(palette)(c / (len(all_n) - 1)), lw=1) for c in index]
+        else:
+            custom_lines = [Line2D([0], [0], color=palette[i], lw=1) for i in index]
+        ax.add_legend(handles=custom_lines, title=hue, labels=list(map(str, legend_n)), ncol=legend_col, bbox_to_anchor=(1.04, 0.95))
+
+    zoom_level = "zoom" if limits else "full"
+
+    ax.set_ylabels("length")
+    ax.set_xlabels("wall clock time [s]")
+    ax.set_titles(row_template = '{row_name}', col_template = '{col_name}')
+    plt.savefig(f"scaling_compact_{problem}_{zoom_level}.svg", pad_inches=0, bbox_inches="tight")
+
+
+
+'''
 Create speedup plot from dataframe and problem name
 Can specify thresholds directly, otherwise scaling_thresholds is used
 '''
-def create_scaling_speedup_plot(df, problem, xticks_n, scaling_thresholds=None, thresholds=None, baseline_df=None, static_ylim=True, y_scaling_limits_speedup=None, yticks_speedup=None):
+def create_scaling_speedup_plot(df, problem, xticks_n, scaling_thresholds=None, thresholds=None, baseline_df=None, static_ylim=True, y_scaling_limits_speedup=None, yticks_speedup=None, ymin=0):
     assert (thresholds is not None) or (scaling_thresholds is not None)
     assert not static_ylim or (y_scaling_limits_speedup is not None and yticks_speedup is not None)
 
@@ -300,33 +343,34 @@ def create_scaling_speedup_plot(df, problem, xticks_n, scaling_thresholds=None, 
             xlim = int(df_speedup["n"].max()) + 1
 
         # Plot the speedup
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(8, 4))
         legend = ["island", "naive"]
         sns.lineplot(ax=ax, x="n", y="wall clock time", hue="mode", hue_order=["island", "naive"], data=df_speedup,
                      legend="full", err_style="bars", err_kws={"ecolor" : "k", "fmt" : "o"}, estimator=np.median, ci=95)
         plt.plot([1,ylim],[1, ylim], "--", color='#888888')
         ax.set(xlabel='n', ylabel='speedup')
-        ax.set_xlim(0, xlim)
-        ax.set_ylim(0, ylim)
         ax.xaxis.set_major_locator(plt.FixedLocator(xticks_n))
         ax.xaxis.set_minor_locator(plt.MultipleLocator(1))
         if static_ylim:
             ax.yaxis.set_major_locator(plt.FixedLocator(yticks_speedup[problem]))
-            ax.yaxis.set_minor_locator(plt.MultipleLocator(1))
+            #ax.yaxis.set_minor_locator(plt.MultipleLocator(1))
+        ax.set_xlim(0, xlim)
+        ax.set_ylim(ymin, ylim)
+        ax.set_autoscale_on(False)
         plt.legend(legend)
-        ax.set_title(f"speedup island model vs naive model (threshold {threshold})")
+        # ax.set_title(f"speedup island model vs naive model (threshold {threshold})")
         fig.savefig(f"speedup_{problem}_{threshold}.pdf", pad_inches=0, bbox_inches="tight")
 
 
 '''
 Create a population scaling barplot from dataframe with predefined wall clock time thresholds
 '''
-def create_population_barplot(line_df, problem, thresholds, palette="plasma"):
+def create_population_barplot(line_df, problem, thresholds, palette="plasma", figsize=(8,6)):
 
     threshold_list = [thresholds[i] for i in [len(thresholds) // 50, len(thresholds) // 10, len(thresholds) // 2, -1]]
 
     for threshold in tqdm(threshold_list):
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=figsize)
         sns.barplot(ax=ax, y="fitness", x="population", data=line_df[line_df["wall clock time"] == threshold], palette=palette)
 
         # Turn thresholds into seconds
@@ -336,6 +380,7 @@ def create_population_barplot(line_df, problem, thresholds, palette="plasma"):
         plt.setp(ax.get_xticklabels(), rotation=45, horizontalalignment='right')
 
         ax.set_title(f"{problem} population comparison after {threshold_name}s")
+        ax.set_ylabel("length")
         fig.savefig(f"population_scaling_{problem}_{threshold_name}s.pdf", pad_inches=0, bbox_inches="tight")
 
 
@@ -360,9 +405,9 @@ def create_communication_boxplot(df, problem, subset_n=None):
     df_mixed = pd.merge(df_mix, df_comp, how="left", on=["rep", "rank", "n", "mode", "elite_size", "epochs", "log_freq", "migration_amount", "period", "population"])
     df_mixed["communication"] = (df_mixed["communication"] / df_mixed["sum"]) * 100
     df_mixed["computation"] = (df_mixed["computation"] / df_mixed["sum"]) * 100
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(8,6))
     sns.boxplot(x="n", y="communication", data=df_mixed[df_mixed["period"] != 0], notch=True)
-    ax.set_title(f"Communication Percentages for {problem}")
+    #ax.set_title(f"Communication Percentages for {problem}")
     ax.set_ylabel("communication fraction [%]")
     fig.savefig(f"communication_boxplot_{problem}.pdf", pad_inches=0, bbox_inches="tight")
 
